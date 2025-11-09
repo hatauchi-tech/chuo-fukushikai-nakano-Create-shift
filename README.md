@@ -24,39 +24,41 @@
 - **フロントエンド**: HTML + Tailwind CSS
 - **アーキテクチャ**: MVC風の構成
 
-## ディレクトリ構成
+## ファイル構成
+
+全てのファイルは同一階層に配置されています（GASエディタで手動デプロイしやすくするため）。
 
 ```
 chuo-fukushikai-nakano-Create-shift/
 ├── appsscript.json                  # GASプロジェクト設定
 ├── シフトアプリ_要件定義書.md      # 要件定義書
 ├── README.md                        # このファイル
-└── src/
-    ├── Code.gs                      # メインエントリーポイント
-    ├── Config.gs                    # 設定管理
-    ├── models/                      # モデル層（データベース）
-    │   ├── BaseModel.gs
-    │   ├── StaffModel.gs            # 職員マスタ
-    │   ├── ShiftModel.gs            # シフトマスタ・シフト表
-    │   ├── RequestModel.gs          # 休み希望
-    │   ├── EventModel.gs            # イベント
-    │   └── RuleModel.gs             # ルールマスタ
-    ├── controllers/                 # コントローラー層
-    │   ├── AuthController.gs        # 認証
-    │   ├── ShiftController.gs       # シフト管理
-    │   └── RequestController.gs     # 休み希望・イベント
-    ├── services/                    # サービス層
-    │   ├── GeminiService.gs         # Gemini API連携
-    │   └── PdfService.gs            # PDF出力
-    ├── views/                       # ビュー層（HTML）
-    │   ├── Login.html               # ログイン画面
-    │   ├── StaffDashboard.html      # 職員用ダッシュボード
-    │   ├── LeaderDashboard.html     # リーダー用ダッシュボード
-    │   └── MasterManagement.html    # マスタ管理画面
-    └── utils/                       # ユーティリティ
-        ├── DateUtils.gs             # 日付処理
-        ├── StringUtils.gs           # 文字列処理
-        └── SampleData.gs            # サンプルデータ投入
+│
+├── Code.gs                          # メインエントリーポイント
+├── Config.gs                        # 設定管理
+│
+├── BaseModel.gs                     # モデル層: ベースモデル
+├── StaffModel.gs                    # モデル層: 職員マスタ
+├── ShiftModel.gs                    # モデル層: シフトマスタ・シフト表
+├── RequestModel.gs                  # モデル層: 休み希望
+├── EventModel.gs                    # モデル層: イベント
+├── RuleModel.gs                     # モデル層: ルールマスタ
+│
+├── AuthController.gs                # コントローラー層: 認証
+├── ShiftController.gs               # コントローラー層: シフト管理
+├── RequestController.gs             # コントローラー層: 休み希望・イベント
+│
+├── GeminiService.gs                 # サービス層: Gemini API連携
+├── PdfService.gs                    # サービス層: PDF出力
+│
+├── DateUtils.gs                     # ユーティリティ: 日付処理
+├── StringUtils.gs                   # ユーティリティ: 文字列処理
+├── SampleData.gs                    # ユーティリティ: サンプルデータ投入
+│
+├── Login.html                       # ビュー層: ログイン画面
+├── StaffDashboard.html              # ビュー層: 職員用ダッシュボード
+├── LeaderDashboard.html             # ビュー層: リーダー用ダッシュボード
+└── MasterManagement.html            # ビュー層: マスタ管理画面
 ```
 
 ## セットアップ手順
@@ -83,29 +85,41 @@ chuo-fukushikai-nakano-Create-shift/
 
 ### 5. ソースコードのデプロイ
 
-#### 方法1: claspを使用する場合（推奨）
+GASエディタで手動でファイルを作成し、コピー＆ペーストします。
 
-```bash
-# claspをインストール（初回のみ）
-npm install -g @google/clasp
+**全20ファイル**を作成する必要があります。詳細は `DEPLOY_CHECKLIST.md` を参照してください。
 
-# Googleアカウントでログイン
-clasp login
-
-# プロジェクトIDを取得して.clasp.jsonを作成
-# （GASエディタの「プロジェクトの設定」からスクリプトIDをコピー）
-clasp clone <スクリプトID>
-
-# ソースコードをプッシュ
-clasp push
-```
-
-#### 方法2: 手動でコピー＆ペーストする場合
+#### 手順:
 
 1. GASエディタで各ファイルを作成
-2. `src/` 配下の各 `.gs` ファイルと `.html` ファイルをコピー＆ペースト
-   - ファイル名は拡張子を除いた名前にする
-   - 例: `Code.gs` → `Code`、`Login.html` → `Login`
+2. 各 `.gs` ファイルと `.html` ファイルをコピー＆ペースト
+   - **ファイル名は拡張子を除いた名前にする**
+   - 例: `Code.gs` → ファイル名 `Code`、`Login.html` → ファイル名 `Login`
+
+#### ファイル作成方法:
+
+**スクリプトファイル (.gs):**
+- GASエディタで「+」ボタン → 「スクリプト」を選択
+- ファイル名を入力（拡張子なし）
+- ファイルの内容をコピー＆ペースト
+
+**HTMLファイル (.html):**
+- GASエディタで「+」ボタン → 「HTML」を選択
+- ファイル名を入力（拡張子なし）
+- ファイルの内容をコピー＆ペースト
+
+**appsscript.json:**
+- GASエディタの「プロジェクトの設定」→「appsscript.jsonをエディタで表示する」をON
+- `appsscript.json`ファイルが表示されるので内容を上書き
+
+#### ファイル一覧（全20ファイル）:
+
+- **基本**: Config, Code
+- **ユーティリティ**: DateUtils, StringUtils, SampleData
+- **モデル**: BaseModel, StaffModel, ShiftModel, RequestModel, EventModel, RuleModel
+- **サービス**: GeminiService, PdfService
+- **コントローラー**: AuthController, ShiftController, RequestController
+- **ビュー**: Login, StaffDashboard, LeaderDashboard, MasterManagement
 
 ### 6. スクリプトプロパティの設定
 
