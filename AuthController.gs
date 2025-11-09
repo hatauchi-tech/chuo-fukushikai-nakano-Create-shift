@@ -137,3 +137,73 @@ function getStaffNamesByGroup(group) {
     };
   }
 }
+
+/**
+ * ログイン認証（クライアント側から直接呼び出し）
+ * @param {string} group - グループ番号
+ * @param {string} name - 氏名
+ * @param {string} password - パスワード
+ * @returns {Object} 認証結果
+ */
+function authenticateUser(group, name, password) {
+  try {
+    Logger.log(`ログイン試行: グループ=${group}, 氏名=${name}`);
+
+    if (!name || !password) {
+      return {
+        success: false,
+        error: '氏名とパスワードを入力してください'
+      };
+    }
+
+    // 職員マスタで認証
+    const staffModel = new StaffModel();
+    const staff = staffModel.authenticate(name, password);
+
+    if (!staff) {
+      Logger.log('認証失敗: 氏名またはパスワードが正しくありません');
+      return {
+        success: false,
+        error: '氏名またはパスワードが正しくありません'
+      };
+    }
+
+    // グループチェック（職員が指定されたグループに所属しているか）
+    if (group && !hasAnyGroup(toEnumList(staff.groups), [group])) {
+      Logger.log('認証失敗: 指定されたグループに所属していません');
+      return {
+        success: false,
+        error: '指定されたグループに所属していません'
+      };
+    }
+
+    // セッション情報を保存
+    const userProperties = PropertiesService.getUserProperties();
+    userProperties.setProperty('sessionUser', JSON.stringify({
+      staffId: staff.staffId,
+      name: staff.name,
+      role: staff.role,
+      groups: staff.groups,
+      unit: staff.unit
+    }));
+
+    Logger.log('ログイン成功: ' + name);
+
+    return {
+      success: true,
+      data: {
+        name: staff.name,
+        role: staff.role,
+        groups: staff.groups,
+        unit: staff.unit
+      }
+    };
+
+  } catch (error) {
+    Logger.log('ログインエラー: ' + error.toString());
+    return {
+      success: false,
+      error: error.toString()
+    };
+  }
+}

@@ -116,42 +116,38 @@
         .getStaffNamesByGroup(selectedGroup);
     }
 
-    document.getElementById('loginForm').addEventListener('submit', async function(e) {
+    // ログインフォーム送信
+    document.getElementById('loginForm').addEventListener('submit', function(e) {
       e.preventDefault();
 
       const formData = new FormData(e.target);
+      const group = formData.get('group');
+      const name = formData.get('name');
+      const password = formData.get('password');
 
-      const data = {
-        action: 'login',
-        groups: formData.get('group'),
-        name: formData.get('name'),
-        password: formData.get('password')
-      };
+      showLoading(true);
 
-      try {
-        showLoading(true);
-        const response = await fetch(window.location.href, {
-          method: 'POST',
-          body: new URLSearchParams(data)
-        });
+      // GAS側のauthenticateUser関数を呼び出し
+      google.script.run
+        .withSuccessHandler(function(result) {
+          showLoading(false);
 
-        const result = await response.json();
-
-        if (result.success) {
-          // ログイン成功 - ロールに応じてリダイレクト
-          if (result.data.role === '管理者') {
-            window.location.href = '?page=leader';
+          if (result.success) {
+            // ログイン成功 - ロールに応じてリダイレクト
+            if (result.data.role === '管理者') {
+              window.top.location.href = '?page=leader';
+            } else {
+              window.top.location.href = '?page=staff';
+            }
           } else {
-            window.location.href = '?page=staff';
+            showError(result.error);
           }
-        } else {
-          showError(result.error);
-        }
-      } catch (error) {
-        showError('通信エラーが発生しました: ' + error.message);
-      } finally {
-        showLoading(false);
-      }
+        })
+        .withFailureHandler(function(error) {
+          showLoading(false);
+          showError('通信エラーが発生しました: ' + error.message);
+        })
+        .authenticateUser(group, name, password);
     });
 
     function showError(message) {
