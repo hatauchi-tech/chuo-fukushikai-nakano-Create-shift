@@ -1,0 +1,105 @@
+/**
+ * 認証コントローラー
+ *
+ * @file controllers/AuthController.gs
+ */
+
+/**
+ * ログイン処理
+ * @param {Object} e - イベントオブジェクト
+ * @returns {ContentService.TextOutput} JSONレスポンス
+ */
+function handleLogin(e) {
+  try {
+    const groups = parseEnumList(e.parameter.groups || '');
+    const name = e.parameter.name;
+    const password = e.parameter.password;
+
+    Logger.log(`ログイン試行: グループ=${groups}, 氏名=${name}`);
+
+    if (!name || !password) {
+      return createJsonResponse(false, '氏名とパスワードを入力してください');
+    }
+
+    // 職員マスタで認証
+    const staffModel = new StaffModel();
+    const staff = staffModel.authenticate(name, password);
+
+    if (!staff) {
+      Logger.log('認証失敗: 氏名またはパスワードが正しくありません');
+      return createJsonResponse(false, '氏名またはパスワードが正しくありません');
+    }
+
+    // グループチェック（職員が指定されたグループに所属しているか）
+    if (groups.length > 0 && !hasAnyGroup(toEnumList(staff.groups), groups)) {
+      Logger.log('認証失敗: 指定されたグループに所属していません');
+      return createJsonResponse(false, '指定されたグループに所属していません');
+    }
+
+    // セッション情報を保存
+    const userProperties = PropertiesService.getUserProperties();
+    userProperties.setProperty('sessionUser', JSON.stringify({
+      staffId: staff.staffId,
+      name: staff.name,
+      role: staff.role,
+      groups: staff.groups,
+      unit: staff.unit
+    }));
+
+    Logger.log('ログイン成功: ' + name);
+
+    return createJsonResponse(true, {
+      name: staff.name,
+      role: staff.role,
+      groups: staff.groups,
+      unit: staff.unit
+    });
+
+  } catch (error) {
+    Logger.log('ログインエラー: ' + error.toString());
+    return createJsonResponse(false, error.toString());
+  }
+}
+
+/**
+ * ログアウト処理
+ * @param {Object} e - イベントオブジェクト
+ * @returns {ContentService.TextOutput} JSONレスポンス
+ */
+function handleLogout(e) {
+  try {
+    const userProperties = PropertiesService.getUserProperties();
+    userProperties.deleteProperty('sessionUser');
+
+    Logger.log('ログアウトしました');
+
+    return createJsonResponse(true, 'ログアウトしました');
+
+  } catch (error) {
+    Logger.log('ログアウトエラー: ' + error.toString());
+    return createJsonResponse(false, error.toString());
+  }
+}
+
+/**
+ * 現在のセッションユーザーを取得
+ * @returns {Object|null} ユーザー情報
+ */
+function getSessionUser() {
+  const userProperties = PropertiesService.getUserProperties();
+  const sessionUser = userProperties.getProperty('sessionUser');
+
+  if (!sessionUser) {
+    return null;
+  }
+
+  return JSON.parse(sessionUser);
+}
+
+/**
+ * セッションチェック（GAS側で使用）
+ * @returns {boolean} セッションが有効かどうか
+ */
+function isLoggedIn() {
+  return getSessionUser() !== null;
+}
