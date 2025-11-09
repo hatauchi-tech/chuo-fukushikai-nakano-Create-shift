@@ -103,3 +103,37 @@ function getSessionUser() {
 function isLoggedIn() {
   return getSessionUser() !== null;
 }
+
+/**
+ * グループに所属する職員名リストを取得（クライアント側から呼び出し）
+ * @param {string} group - グループ番号
+ * @returns {Object} 職員名リスト
+ */
+function getStaffNamesByGroup(group) {
+  try {
+    const staffModel = new StaffModel();
+
+    if (!group || group === '') {
+      // グループ指定なしの場合は全職員
+      const staffs = staffModel.getActiveStaffs();
+      return {
+        success: true,
+        data: staffs.map(staff => staff.name).sort()
+      };
+    }
+
+    // 指定グループの職員のみ
+    const staffs = staffModel.getStaffsByGroup([group]);
+    return {
+      success: true,
+      data: staffs.map(staff => staff.name).sort()
+    };
+
+  } catch (error) {
+    Logger.log('職員名リスト取得エラー: ' + error.toString());
+    return {
+      success: false,
+      error: error.toString()
+    };
+  }
+}
