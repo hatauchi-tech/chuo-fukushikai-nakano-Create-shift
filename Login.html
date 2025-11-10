@@ -132,12 +132,10 @@
         .withSuccessHandler(function(result) {
           if (result.success) {
             // ログイン成功 - スクリプトURLを取得して遷移
+            // 管理者も一般も、まず休み希望提出画面（staff）に遷移
             google.script.run
               .withSuccessHandler(function(scriptUrl) {
-                // ロールに応じてページパラメータを設定
-                const page = result.data.role === '管理者' ? 'leader' : 'staff';
-                // 完全なURLで遷移
-                window.top.location.href = scriptUrl + '?page=' + page;
+                window.top.location.href = scriptUrl + '?page=staff';
               })
               .withFailureHandler(function(error) {
                 showLoading(false);

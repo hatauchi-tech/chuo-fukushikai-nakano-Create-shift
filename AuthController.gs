@@ -82,6 +82,31 @@ function handleLogout(e) {
 }
 
 /**
+ * ログアウト（クライアント側から直接呼び出し）
+ * @returns {Object} ログアウト結果
+ */
+function logoutUser() {
+  try {
+    const userProperties = PropertiesService.getUserProperties();
+    userProperties.deleteProperty('sessionUser');
+
+    Logger.log('ログアウトしました');
+
+    return {
+      success: true,
+      message: 'ログアウトしました'
+    };
+
+  } catch (error) {
+    Logger.log('ログアウトエラー: ' + error.toString());
+    return {
+      success: false,
+      error: error.toString()
+    };
+  }
+}
+
+/**
  * 現在のセッションユーザーを取得
  * @returns {Object|null} ユーザー情報
  */
