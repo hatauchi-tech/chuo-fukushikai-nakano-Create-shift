@@ -407,31 +407,3 @@ function deleteEvent(eventId) {
     };
   }
 }
-      const [year, month] = yearMonth.split('-').map(Number);
-      targetMonth = new Date(year, month - 1, 1);
-    } else {
-      // 指定がない場合は翌月
-      targetMonth = getNextMonth(new Date());
-    }
-
-    const eventModel = new EventModel();
-    const events = eventModel.getMonthEvents(groupArray, unit, targetMonth);
-
-    return {
-      success: true,
-      data: events.map(event => ({
-        eventId: event.eventId,
-        eventDate: formatDate(event.eventDate),
-        content: event.content,
-        registeredBy: event.registeredBy
-      }))
-    };
-
-  } catch (error) {
-    Logger.log('イベント取得エラー: ' + error.toString());
-    return {
-      success: false,
-      error: error.toString()
-    };
-  }
-}
