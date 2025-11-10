@@ -193,6 +193,236 @@ function getEvents(groups, unit, yearMonth) {
         eventId: event.eventId,
         eventDate: formatDate(event.eventDate),
         content: event.content,
+        registeredBy: event.registeredBy,
+        groups: event.groups,
+        unit: event.unit
+      }))
+    };
+
+  } catch (error) {
+    Logger.log('イベント取得エラー: ' + error.toString());
+    return {
+      success: false,
+      error: error.toString()
+    };
+  }
+}
+
+/**
+ * 全イベントを取得（管理者用・クライアント側から呼び出し）
+ * @returns {Object} イベントデータ
+ */
+function getAllEventsForAdmin() {
+  try {
+    const user = getSessionUser();
+    if (!user || user.role !== '管理者') {
+      return {
+        success: false,
+        error: '管理者権限が必要です'
+      };
+    }
+
+    const eventModel = new EventModel();
+    const events = eventModel.getAllEvents();
+
+    return {
+      success: true,
+      data: events.map(event => ({
+        eventId: event.eventId,
+        eventDate: formatDate(event.eventDate),
+        content: event.content,
+        registeredBy: event.registeredBy,
+        groups: event.groups,
+        unit: event.unit
+      }))
+    };
+
+  } catch (error) {
+    Logger.log('全イベント取得エラー: ' + error.toString());
+    return {
+      success: false,
+      error: error.toString()
+    };
+  }
+}
+
+/**
+ * イベントを保存（クライアント側から呼び出し）
+ * @param {string} eventDate - イベント日（YYYY/MM/DD形式）
+ * @param {string} groups - グループ（カンマ区切り）
+ * @param {string} unit - ユニット
+ * @param {string} content - 内容
+ * @returns {Object} 保存結果
+ */
+function saveEvent(eventDate, groups, unit, content) {
+  try {
+    const user = getSessionUser();
+    if (!user || user.role !== '管理者') {
+      return {
+        success: false,
+        error: '管理者権限が必要です'
+      };
+    }
+
+    if (!eventDate || !content) {
+      return {
+        success: false,
+        error: 'イベント日と内容を指定してください'
+      };
+    }
+
+    const eventModel = new EventModel();
+    const eventId = eventModel.addEvent({
+      registeredBy: user.name,
+      eventDate: parseDate(eventDate),
+      groups: parseEnumList(groups),
+      unit: unit || '',
+      content: content
+    });
+
+    Logger.log('イベントを保存しました: ' + eventId);
+
+    return {
+      success: true,
+      data: {
+        eventId: eventId,
+        message: 'イベントを保存しました'
+      }
+    };
+
+  } catch (error) {
+    Logger.log('イベント保存エラー: ' + error.toString());
+    return {
+      success: false,
+      error: error.toString()
+    };
+  }
+}
+
+/**
+ * イベントを更新（クライアント側から呼び出し）
+ * @param {string} eventId - イベントID
+ * @param {string} eventDate - イベント日（YYYY/MM/DD形式）
+ * @param {string} groups - グループ（カンマ区切り）
+ * @param {string} unit - ユニット
+ * @param {string} content - 内容
+ * @returns {Object} 更新結果
+ */
+function updateEvent(eventId, eventDate, groups, unit, content) {
+  try {
+    const user = getSessionUser();
+    if (!user || user.role !== '管理者') {
+      return {
+        success: false,
+        error: '管理者権限が必要です'
+      };
+    }
+
+    if (!eventId || !eventDate || !content) {
+      return {
+        success: false,
+        error: 'イベントID、イベント日、内容を指定してください'
+      };
+    }
+
+    const eventModel = new EventModel();
+    const result = eventModel.updateEvent(eventId, {
+      eventDate: parseDate(eventDate),
+      groups: parseEnumList(groups),
+      unit: unit || '',
+      content: content
+    });
+
+    if (!result) {
+      return {
+        success: false,
+        error: 'イベントの更新に失敗しました'
+      };
+    }
+
+    Logger.log('イベントを更新しました: ' + eventId);
+
+    return {
+      success: true,
+      data: {
+        message: 'イベントを更新しました'
+      }
+    };
+
+  } catch (error) {
+    Logger.log('イベント更新エラー: ' + error.toString());
+    return {
+      success: false,
+      error: error.toString()
+    };
+  }
+}
+
+/**
+ * イベントを削除（クライアント側から呼び出し）
+ * @param {string} eventId - イベントID
+ * @returns {Object} 削除結果
+ */
+function deleteEvent(eventId) {
+  try {
+    const user = getSessionUser();
+    if (!user || user.role !== '管理者') {
+      return {
+        success: false,
+        error: '管理者権限が必要です'
+      };
+    }
+
+    if (!eventId) {
+      return {
+        success: false,
+        error: 'イベントIDを指定してください'
+      };
+    }
+
+    const eventModel = new EventModel();
+    const result = eventModel.deleteEvent(eventId);
+
+    if (!result) {
+      return {
+        success: false,
+        error: 'イベントの削除に失敗しました'
+      };
+    }
+
+    Logger.log('イベントを削除しました: ' + eventId);
+
+    return {
+      success: true,
+      data: {
+        message: 'イベントを削除しました'
+      }
+    };
+
+  } catch (error) {
+    Logger.log('イベント削除エラー: ' + error.toString());
+    return {
+      success: false,
+      error: error.toString()
+    };
+  }
+}
+      const [year, month] = yearMonth.split('-').map(Number);
+      targetMonth = new Date(year, month - 1, 1);
+    } else {
+      // 指定がない場合は翌月
+      targetMonth = getNextMonth(new Date());
+    }
+
+    const eventModel = new EventModel();
+    const events = eventModel.getMonthEvents(groupArray, unit, targetMonth);
+
+    return {
+      success: true,
+      data: events.map(event => ({
+        eventId: event.eventId,
+        eventDate: formatDate(event.eventDate),
+        content: event.content,
         registeredBy: event.registeredBy
       }))
     };
