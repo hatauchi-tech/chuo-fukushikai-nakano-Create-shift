@@ -295,13 +295,13 @@
           loadEventManagement();
           break;
         case 'staff':
-          content.innerHTML = '<p class="text-gray-500 text-center">職員マスタ管理機能は開発中です</p>';
+          loadStaffManagement();
           break;
         case 'shift':
-          content.innerHTML = '<p class="text-gray-500 text-center">シフトマスタ管理機能は開発中です</p>';
+          loadShiftManagement();
           break;
         case 'rule':
-          content.innerHTML = '<p class="text-gray-500 text-center">ルールマスタ管理機能は開発中です</p>';
+          loadRuleManagement();
           break;
         default:
           content.innerHTML = '<p class="text-gray-500 text-center">マスタ管理機能は開発中です</p>';
@@ -613,6 +613,721 @@
           showMessage('通信エラー: ' + error.message, 'error');
         })
         .deleteEvent(eventId);
+    }
+
+    // ====================
+    // 職員マスタ管理
+    // ====================
+
+    let editingStaffId = null;
+
+    // 職員マスタ管理画面の読み込み
+    function loadStaffManagement() {
+      const content = document.getElementById('masterContent');
+      content.innerHTML = `
+        <div class="space-y-6">
+          <!-- 職員登録フォーム -->
+          <div class="border-b pb-6">
+            <h3 class="text-lg font-bold mb-4">職員登録</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">氏名 <span class="text-red-500">*</span></label>
+                <input type="text" id="staffName" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="山田太郎">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">所属</label>
+                <input type="text" id="staffDepartment" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="介護部">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">役職</label>
+                <input type="text" id="staffPosition" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="介護職員">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">ユニット</label>
+                <input type="text" id="staffUnit" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="A">
+              </div>
+              <div class="md:col-span-2">
+                <label class="block text-sm font-medium text-gray-700 mb-2">グループ</label>
+                <div class="grid grid-cols-6 gap-2">
+                  <label class="flex items-center space-x-1">
+                    <input type="checkbox" name="staffGroups" value="1" class="rounded">
+                    <span class="text-sm">グループ1</span>
+                  </label>
+                  <label class="flex items-center space-x-1">
+                    <input type="checkbox" name="staffGroups" value="2" class="rounded">
+                    <span class="text-sm">グループ2</span>
+                  </label>
+                  <label class="flex items-center space-x-1">
+                    <input type="checkbox" name="staffGroups" value="3" class="rounded">
+                    <span class="text-sm">グループ3</span>
+                  </label>
+                  <label class="flex items-center space-x-1">
+                    <input type="checkbox" name="staffGroups" value="4" class="rounded">
+                    <span class="text-sm">グループ4</span>
+                  </label>
+                  <label class="flex items-center space-x-1">
+                    <input type="checkbox" name="staffGroups" value="5" class="rounded">
+                    <span class="text-sm">グループ5</span>
+                  </label>
+                  <label class="flex items-center space-x-1">
+                    <input type="checkbox" name="staffGroups" value="6" class="rounded">
+                    <span class="text-sm">グループ6</span>
+                  </label>
+                </div>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">権限</label>
+                <select id="staffRole" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="一般">一般</option>
+                  <option value="管理者">管理者</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">雇用形態</label>
+                <select id="staffEmploymentType" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="常勤">常勤</option>
+                  <option value="派遣">派遣</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">勤務配慮</label>
+                <input type="text" id="staffWorkConsiderations" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="特になし">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">パスワード</label>
+                <input type="password" id="staffPassword" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="password123">
+              </div>
+              <div class="flex items-center space-x-4">
+                <label class="flex items-center space-x-2">
+                  <input type="checkbox" id="staffIsSuctionCertified" class="rounded">
+                  <span class="text-sm">喀痰吸引資格者</span>
+                </label>
+                <label class="flex items-center space-x-2">
+                  <input type="checkbox" id="staffIsActive" class="rounded" checked>
+                  <span class="text-sm">有効</span>
+                </label>
+              </div>
+            </div>
+            <div class="mt-4 flex space-x-2">
+              <button onclick="saveNewStaff()" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700 font-medium">登録</button>
+              <button onclick="clearStaffForm()" class="bg-gray-400 text-white px-6 py-2 rounded hover:bg-gray-500">クリア</button>
+            </div>
+          </div>
+          <!-- 職員一覧 -->
+          <div>
+            <h3 class="text-lg font-bold mb-4">職員一覧</h3>
+            <div id="staffTableContainer">
+              <p class="text-gray-500 text-center py-4">読み込み中...</p>
+            </div>
+          </div>
+        </div>
+      `;
+      loadAllStaffs();
+    }
+
+    // 全職員読み込み
+    function loadAllStaffs() {
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            renderStaffTable(result.data);
+          } else {
+            document.getElementById('staffTableContainer').innerHTML = '<p class="text-red-500">エラー: ' + result.error + '</p>';
+          }
+        })
+        .withFailureHandler(function(error) {
+          document.getElementById('staffTableContainer').innerHTML = '<p class="text-red-500">読み込みエラー: ' + error.message + '</p>';
+        })
+        .getAllStaffsForAdmin();
+    }
+
+    // 職員一覧表示
+    function renderStaffTable(staffs) {
+      const container = document.getElementById('staffTableContainer');
+      if (staffs.length === 0) {
+        container.innerHTML = '<p class="text-gray-500 text-center py-4">登録されている職員はいません</p>';
+        return;
+      }
+      let html = '<div class="overflow-x-auto"><table class="min-w-full border-collapse border border-gray-300 text-sm">';
+      html += '<thead><tr class="bg-gray-100">';
+      html += '<th class="border border-gray-300 p-2 text-left">氏名</th>';
+      html += '<th class="border border-gray-300 p-2 text-left">所属</th>';
+      html += '<th class="border border-gray-300 p-2 text-left">役職</th>';
+      html += '<th class="border border-gray-300 p-2 text-left">グループ</th>';
+      html += '<th class="border border-gray-300 p-2 text-left">ユニット</th>';
+      html += '<th class="border border-gray-300 p-2 text-left">権限</th>';
+      html += '<th class="border border-gray-300 p-2 text-left">雇用形態</th>';
+      html += '<th class="border border-gray-300 p-2 text-center">有効</th>';
+      html += '<th class="border border-gray-300 p-2 text-center">操作</th>';
+      html += '</tr></thead><tbody>';
+      staffs.forEach(staff => {
+        html += '<tr>';
+        html += `<td class="border border-gray-300 p-2">${staff.name}</td>`;
+        html += `<td class="border border-gray-300 p-2">${staff.department || '-'}</td>`;
+        html += `<td class="border border-gray-300 p-2">${staff.position || '-'}</td>`;
+        html += `<td class="border border-gray-300 p-2">${staff.groups.join(', ') || '-'}</td>`;
+        html += `<td class="border border-gray-300 p-2">${staff.unit || '-'}</td>`;
+        html += `<td class="border border-gray-300 p-2">${staff.role}</td>`;
+        html += `<td class="border border-gray-300 p-2">${staff.employmentType}</td>`;
+        html += `<td class="border border-gray-300 p-2 text-center">${staff.isActive ? '✓' : '✗'}</td>`;
+        html += `<td class="border border-gray-300 p-2 text-center">
+          <button onclick='editStaff(${JSON.stringify(staff)})' class="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 mr-1">編集</button>
+          <button onclick="deleteStaffConfirm('${staff.staffId}')" class="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600">削除</button>
+        </td>`;
+        html += '</tr>';
+      });
+      html += '</tbody></table></div>';
+      container.innerHTML = html;
+    }
+
+    // 職員登録フォームをクリア
+    function clearStaffForm() {
+      document.getElementById('staffName').value = '';
+      document.getElementById('staffDepartment').value = '';
+      document.getElementById('staffPosition').value = '';
+      document.getElementById('staffUnit').value = '';
+      document.getElementById('staffRole').value = '一般';
+      document.getElementById('staffEmploymentType').value = '常勤';
+      document.getElementById('staffWorkConsiderations').value = '';
+      document.getElementById('staffPassword').value = '';
+      document.getElementById('staffIsSuctionCertified').checked = false;
+      document.getElementById('staffIsActive').checked = true;
+      document.querySelectorAll('input[name="staffGroups"]').forEach(cb => cb.checked = false);
+      editingStaffId = null;
+      const saveButton = document.querySelector('button[onclick="saveNewStaff()"]');
+      if (saveButton) {
+        saveButton.textContent = '登録';
+        saveButton.onclick = saveNewStaff;
+      }
+    }
+
+    // 新規職員保存
+    function saveNewStaff() {
+      const name = document.getElementById('staffName').value;
+      const department = document.getElementById('staffDepartment').value;
+      const position = document.getElementById('staffPosition').value;
+      const unit = document.getElementById('staffUnit').value;
+      const role = document.getElementById('staffRole').value;
+      const employmentType = document.getElementById('staffEmploymentType').value;
+      const workConsiderations = document.getElementById('staffWorkConsiderations').value;
+      const password = document.getElementById('staffPassword').value;
+      const isSuctionCertified = document.getElementById('staffIsSuctionCertified').checked;
+      const isActive = document.getElementById('staffIsActive').checked;
+      const groups = Array.from(document.querySelectorAll('input[name="staffGroups"]:checked')).map(cb => cb.value).join(',');
+
+      if (!name) {
+        showMessage('氏名を入力してください', 'warning');
+        return;
+      }
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            showMessage('職員を登録しました', 'success');
+            clearStaffForm();
+            loadAllStaffs();
+          } else {
+            showMessage('エラー: ' + result.error, 'error');
+          }
+        })
+        .withFailureHandler(function(error) {
+          showMessage('通信エラー: ' + error.message, 'error');
+        })
+        .saveStaff(department, position, groups, unit, name, isSuctionCertified, workConsiderations, role, employmentType, isActive, password);
+    }
+
+    // 職員編集
+    function editStaff(staff) {
+      editingStaffId = staff.staffId;
+      document.getElementById('staffName').value = staff.name;
+      document.getElementById('staffDepartment').value = staff.department || '';
+      document.getElementById('staffPosition').value = staff.position || '';
+      document.getElementById('staffUnit').value = staff.unit || '';
+      document.getElementById('staffRole').value = staff.role;
+      document.getElementById('staffEmploymentType').value = staff.employmentType;
+      document.getElementById('staffWorkConsiderations').value = staff.workConsiderations || '';
+      document.getElementById('staffPassword').value = '';
+      document.getElementById('staffIsSuctionCertified').checked = staff.isSuctionCertified;
+      document.getElementById('staffIsActive').checked = staff.isActive;
+      document.querySelectorAll('input[name="staffGroups"]').forEach(cb => {
+        cb.checked = staff.groups.includes(cb.value);
+      });
+      const saveButton = document.querySelector('button[onclick="saveNewStaff()"]');
+      if (saveButton) {
+        saveButton.textContent = '更新';
+        saveButton.onclick = function() { updateStaffData(); };
+      }
+      document.getElementById('masterContent').scrollTop = 0;
+      showMessage('編集モードです。更新ボタンを押して保存してください', 'info');
+    }
+
+    // 職員更新
+    function updateStaffData() {
+      if (!editingStaffId) {
+        showMessage('編集対象が選択されていません', 'error');
+        return;
+      }
+      const name = document.getElementById('staffName').value;
+      const department = document.getElementById('staffDepartment').value;
+      const position = document.getElementById('staffPosition').value;
+      const unit = document.getElementById('staffUnit').value;
+      const role = document.getElementById('staffRole').value;
+      const employmentType = document.getElementById('staffEmploymentType').value;
+      const workConsiderations = document.getElementById('staffWorkConsiderations').value;
+      const password = document.getElementById('staffPassword').value;
+      const isSuctionCertified = document.getElementById('staffIsSuctionCertified').checked;
+      const isActive = document.getElementById('staffIsActive').checked;
+      const groups = Array.from(document.querySelectorAll('input[name="staffGroups"]:checked')).map(cb => cb.value).join(',');
+
+      if (!name) {
+        showMessage('氏名を入力してください', 'warning');
+        return;
+      }
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            showMessage('職員を更新しました', 'success');
+            clearStaffForm();
+            loadAllStaffs();
+          } else {
+            showMessage('エラー: ' + result.error, 'error');
+          }
+        })
+        .withFailureHandler(function(error) {
+          showMessage('通信エラー: ' + error.message, 'error');
+        })
+        .updateStaff(editingStaffId, department, position, groups, unit, name, isSuctionCertified, workConsiderations, role, employmentType, isActive, password);
+    }
+
+    // 職員削除確認
+    function deleteStaffConfirm(staffId) {
+      if (confirm('この職員を削除（無効化）しますか？')) {
+        deleteStaffData(staffId);
+      }
+    }
+
+    // 職員削除
+    function deleteStaffData(staffId) {
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            showMessage('職員を削除しました', 'success');
+            loadAllStaffs();
+          } else {
+            showMessage('エラー: ' + result.error, 'error');
+          }
+        })
+        .withFailureHandler(function(error) {
+          showMessage('通信エラー: ' + error.message, 'error');
+        })
+        .deleteStaff(staffId);
+    }
+
+    // ====================
+    // シフトマスタ管理
+    // ====================
+
+    let editingShiftId = null;
+
+    // シフトマスタ管理画面の読み込み
+    function loadShiftManagement() {
+      const content = document.getElementById('masterContent');
+      content.innerHTML = `
+        <div class="space-y-6">
+          <!-- シフト登録フォーム -->
+          <div class="border-b pb-6">
+            <h3 class="text-lg font-bold mb-4">シフト登録</h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">シフト名 <span class="text-red-500">*</span></label>
+                <input type="text" id="shiftName" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="早出">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">開始時間</label>
+                <input type="time" id="shiftStartTime" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">終了時間</label>
+                <input type="time" id="shiftEndTime" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+              </div>
+            </div>
+            <div class="mt-4 flex space-x-2">
+              <button onclick="saveNewShift()" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700 font-medium">登録</button>
+              <button onclick="clearShiftForm()" class="bg-gray-400 text-white px-6 py-2 rounded hover:bg-gray-500">クリア</button>
+            </div>
+          </div>
+          <!-- シフト一覧 -->
+          <div>
+            <h3 class="text-lg font-bold mb-4">シフト一覧</h3>
+            <div id="shiftTableContainer">
+              <p class="text-gray-500 text-center py-4">読み込み中...</p>
+            </div>
+          </div>
+        </div>
+      `;
+      loadAllShifts();
+    }
+
+    // 全シフト読み込み
+    function loadAllShifts() {
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            renderShiftTable(result.data);
+          } else {
+            document.getElementById('shiftTableContainer').innerHTML = '<p class="text-red-500">エラー: ' + result.error + '</p>';
+          }
+        })
+        .withFailureHandler(function(error) {
+          document.getElementById('shiftTableContainer').innerHTML = '<p class="text-red-500">読み込みエラー: ' + error.message + '</p>';
+        })
+        .getAllShiftsForAdmin();
+    }
+
+    // シフト一覧表示
+    function renderShiftTable(shifts) {
+      const container = document.getElementById('shiftTableContainer');
+      if (shifts.length === 0) {
+        container.innerHTML = '<p class="text-gray-500 text-center py-4">登録されているシフトはありません</p>';
+        return;
+      }
+      let html = '<table class="min-w-full border-collapse border border-gray-300">';
+      html += '<thead><tr class="bg-gray-100">';
+      html += '<th class="border border-gray-300 p-2 text-left">シフト名</th>';
+      html += '<th class="border border-gray-300 p-2 text-left">開始時間</th>';
+      html += '<th class="border border-gray-300 p-2 text-left">終了時間</th>';
+      html += '<th class="border border-gray-300 p-2 text-center">操作</th>';
+      html += '</tr></thead><tbody>';
+      shifts.forEach(shift => {
+        html += '<tr>';
+        html += `<td class="border border-gray-300 p-2">${shift.name}</td>`;
+        html += `<td class="border border-gray-300 p-2">${shift.startTime || '-'}</td>`;
+        html += `<td class="border border-gray-300 p-2">${shift.endTime || '-'}</td>`;
+        html += `<td class="border border-gray-300 p-2 text-center">
+          <button onclick='editShift(${JSON.stringify(shift)})' class="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 mr-1">編集</button>
+          <button onclick="deleteShiftConfirm('${shift.shiftId}')" class="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600">削除</button>
+        </td>`;
+        html += '</tr>';
+      });
+      html += '</tbody></table>';
+      container.innerHTML = html;
+    }
+
+    // シフト登録フォームをクリア
+    function clearShiftForm() {
+      document.getElementById('shiftName').value = '';
+      document.getElementById('shiftStartTime').value = '';
+      document.getElementById('shiftEndTime').value = '';
+      editingShiftId = null;
+      const saveButton = document.querySelector('button[onclick="saveNewShift()"]');
+      if (saveButton) {
+        saveButton.textContent = '登録';
+        saveButton.onclick = saveNewShift;
+      }
+    }
+
+    // 新規シフト保存
+    function saveNewShift() {
+      const name = document.getElementById('shiftName').value;
+      const startTime = document.getElementById('shiftStartTime').value;
+      const endTime = document.getElementById('shiftEndTime').value;
+
+      if (!name) {
+        showMessage('シフト名を入力してください', 'warning');
+        return;
+      }
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            showMessage('シフトを登録しました', 'success');
+            clearShiftForm();
+            loadAllShifts();
+          } else {
+            showMessage('エラー: ' + result.error, 'error');
+          }
+        })
+        .withFailureHandler(function(error) {
+          showMessage('通信エラー: ' + error.message, 'error');
+        })
+        .saveShift(name, startTime, endTime);
+    }
+
+    // シフト編集
+    function editShift(shift) {
+      editingShiftId = shift.shiftId;
+      document.getElementById('shiftName').value = shift.name;
+      document.getElementById('shiftStartTime').value = shift.startTime || '';
+      document.getElementById('shiftEndTime').value = shift.endTime || '';
+      const saveButton = document.querySelector('button[onclick="saveNewShift()"]');
+      if (saveButton) {
+        saveButton.textContent = '更新';
+        saveButton.onclick = function() { updateShift(); };
+      }
+      document.getElementById('masterContent').scrollTop = 0;
+      showMessage('編集モードです。更新ボタンを押して保存してください', 'info');
+    }
+
+    // シフト更新
+    function updateShift() {
+      if (!editingShiftId) {
+        showMessage('編集対象が選択されていません', 'error');
+        return;
+      }
+      const name = document.getElementById('shiftName').value;
+      const startTime = document.getElementById('shiftStartTime').value;
+      const endTime = document.getElementById('shiftEndTime').value;
+
+      if (!name) {
+        showMessage('シフト名を入力してください', 'warning');
+        return;
+      }
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            showMessage('シフトを更新しました', 'success');
+            clearShiftForm();
+            loadAllShifts();
+          } else {
+            showMessage('エラー: ' + result.error, 'error');
+          }
+        })
+        .withFailureHandler(function(error) {
+          showMessage('通信エラー: ' + error.message, 'error');
+        })
+        .updateShiftData(editingShiftId, name, startTime, endTime);
+    }
+
+    // シフト削除確認
+    function deleteShiftConfirm(shiftId) {
+      if (confirm('このシフトを削除しますか？')) {
+        deleteShift(shiftId);
+      }
+    }
+
+    // シフト削除
+    function deleteShift(shiftId) {
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            showMessage('シフトを削除しました', 'success');
+            loadAllShifts();
+          } else {
+            showMessage('エラー: ' + result.error, 'error');
+          }
+        })
+        .withFailureHandler(function(error) {
+          showMessage('通信エラー: ' + error.message, 'error');
+        })
+        .deleteShiftData(shiftId);
+    }
+
+    // ====================
+    // ルールマスタ管理
+    // ====================
+
+    let editingRuleId = null;
+
+    // ルールマスタ管理画面の読み込み
+    function loadRuleManagement() {
+      const content = document.getElementById('masterContent');
+      content.innerHTML = `
+        <div class="space-y-6">
+          <!-- ルール登録フォーム -->
+          <div class="border-b pb-6">
+            <h3 class="text-lg font-bold mb-4">ルール登録</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">ルール名 <span class="text-red-500">*</span></label>
+                <input type="text" id="ruleName" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="夜勤は週2回まで">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">重要度</label>
+                <select id="rulePriority" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="最高">最高</option>
+                  <option value="高">高</option>
+                  <option value="中" selected>中</option>
+                  <option value="低">低</option>
+                  <option value="最低">最低</option>
+                </select>
+              </div>
+              <div class="md:col-span-2">
+                <label class="block text-sm font-medium text-gray-700 mb-2">内容 <span class="text-red-500">*</span></label>
+                <textarea id="ruleContent" rows="4" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="各職員の夜勤勤務は週に2回までとする。"></textarea>
+              </div>
+            </div>
+            <div class="mt-4 flex space-x-2">
+              <button onclick="saveNewRule()" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700 font-medium">登録</button>
+              <button onclick="clearRuleForm()" class="bg-gray-400 text-white px-6 py-2 rounded hover:bg-gray-500">クリア</button>
+            </div>
+          </div>
+          <!-- ルール一覧 -->
+          <div>
+            <h3 class="text-lg font-bold mb-4">ルール一覧</h3>
+            <div id="ruleTableContainer">
+              <p class="text-gray-500 text-center py-4">読み込み中...</p>
+            </div>
+          </div>
+        </div>
+      `;
+      loadAllRules();
+    }
+
+    // 全ルール読み込み
+    function loadAllRules() {
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            renderRuleTable(result.data);
+          } else {
+            document.getElementById('ruleTableContainer').innerHTML = '<p class="text-red-500">エラー: ' + result.error + '</p>';
+          }
+        })
+        .withFailureHandler(function(error) {
+          document.getElementById('ruleTableContainer').innerHTML = '<p class="text-red-500">読み込みエラー: ' + error.message + '</p>';
+        })
+        .getAllRulesForAdmin();
+    }
+
+    // ルール一覧表示
+    function renderRuleTable(rules) {
+      const container = document.getElementById('ruleTableContainer');
+      if (rules.length === 0) {
+        container.innerHTML = '<p class="text-gray-500 text-center py-4">登録されているルールはありません</p>';
+        return;
+      }
+      let html = '<table class="min-w-full border-collapse border border-gray-300">';
+      html += '<thead><tr class="bg-gray-100">';
+      html += '<th class="border border-gray-300 p-2 text-left">ルール名</th>';
+      html += '<th class="border border-gray-300 p-2 text-left">内容</th>';
+      html += '<th class="border border-gray-300 p-2 text-left">重要度</th>';
+      html += '<th class="border border-gray-300 p-2 text-center">操作</th>';
+      html += '</tr></thead><tbody>';
+      rules.forEach(rule => {
+        html += '<tr>';
+        html += `<td class="border border-gray-300 p-2">${rule.name}</td>`;
+        html += `<td class="border border-gray-300 p-2">${rule.content}</td>`;
+        html += `<td class="border border-gray-300 p-2">${rule.priority}</td>`;
+        html += `<td class="border border-gray-300 p-2 text-center">
+          <button onclick='editRule(${JSON.stringify(rule)})' class="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 mr-1">編集</button>
+          <button onclick="deleteRuleConfirm('${rule.ruleId}')" class="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600">削除</button>
+        </td>`;
+        html += '</tr>';
+      });
+      html += '</tbody></table>';
+      container.innerHTML = html;
+    }
+
+    // ルール登録フォームをクリア
+    function clearRuleForm() {
+      document.getElementById('ruleName').value = '';
+      document.getElementById('ruleContent').value = '';
+      document.getElementById('rulePriority').value = '中';
+      editingRuleId = null;
+      const saveButton = document.querySelector('button[onclick="saveNewRule()"]');
+      if (saveButton) {
+        saveButton.textContent = '登録';
+        saveButton.onclick = saveNewRule;
+      }
+    }
+
+    // 新規ルール保存
+    function saveNewRule() {
+      const name = document.getElementById('ruleName').value;
+      const content = document.getElementById('ruleContent').value;
+      const priority = document.getElementById('rulePriority').value;
+
+      if (!name || !content) {
+        showMessage('ルール名と内容を入力してください', 'warning');
+        return;
+      }
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            showMessage('ルールを登録しました', 'success');
+            clearRuleForm();
+            loadAllRules();
+          } else {
+            showMessage('エラー: ' + result.error, 'error');
+          }
+        })
+        .withFailureHandler(function(error) {
+          showMessage('通信エラー: ' + error.message, 'error');
+        })
+        .saveRule(name, content, priority);
+    }
+
+    // ルール編集
+    function editRule(rule) {
+      editingRuleId = rule.ruleId;
+      document.getElementById('ruleName').value = rule.name;
+      document.getElementById('ruleContent').value = rule.content;
+      document.getElementById('rulePriority').value = rule.priority;
+      const saveButton = document.querySelector('button[onclick="saveNewRule()"]');
+      if (saveButton) {
+        saveButton.textContent = '更新';
+        saveButton.onclick = function() { updateRule(); };
+      }
+      document.getElementById('masterContent').scrollTop = 0;
+      showMessage('編集モードです。更新ボタンを押して保存してください', 'info');
+    }
+
+    // ルール更新
+    function updateRule() {
+      if (!editingRuleId) {
+        showMessage('編集対象が選択されていません', 'error');
+        return;
+      }
+      const name = document.getElementById('ruleName').value;
+      const content = document.getElementById('ruleContent').value;
+      const priority = document.getElementById('rulePriority').value;
+
+      if (!name || !content) {
+        showMessage('ルール名と内容を入力してください', 'warning');
+        return;
+      }
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            showMessage('ルールを更新しました', 'success');
+            clearRuleForm();
+            loadAllRules();
+          } else {
+            showMessage('エラー: ' + result.error, 'error');
+          }
+        })
+        .withFailureHandler(function(error) {
+          showMessage('通信エラー: ' + error.message, 'error');
+        })
+        .updateRuleData(editingRuleId, name, content, priority);
+    }
+
+    // ルール削除確認
+    function deleteRuleConfirm(ruleId) {
+      if (confirm('このルールを削除しますか？')) {
+        deleteRule(ruleId);
+      }
+    }
+
+    // ルール削除
+    function deleteRule(ruleId) {
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            showMessage('ルールを削除しました', 'success');
+            loadAllRules();
+          } else {
+            showMessage('エラー: ' + result.error, 'error');
+          }
+        })
+        .withFailureHandler(function(error) {
+          showMessage('通信エラー: ' + error.message, 'error');
+        })
+        .deleteRuleData(ruleId);
     }
 
     // ログアウト

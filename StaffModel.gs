@@ -104,6 +104,15 @@ class StaffModel extends BaseModel {
   }
 
   /**
+   * すべての職員を取得（有効・無効含む）
+   * @returns {Array<Object>} 職員データの配列
+   */
+  getAllStaffs() {
+    const data = this.getAllData();
+    return data.map(this._rowToObject.bind(this));
+  }
+
+  /**
    * 有効な職員のみを取得
    * @returns {Array<Object>} 職員データの配列
    */

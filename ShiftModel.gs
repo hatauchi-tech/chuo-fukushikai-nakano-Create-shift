@@ -69,6 +69,48 @@ class ShiftModel extends BaseModel {
     const result = this.findBy(1, shiftName);
     return result.length > 0 ? result[0].data[0] : null;
   }
+
+  /**
+   * シフトを更新
+   * @param {string} shiftId - シフトID
+   * @param {Object} shiftData - 更新するシフトデータ
+   * @returns {boolean} 成功したかどうか
+   */
+  updateShift(shiftId, shiftData) {
+    const result = this.findById(shiftId, 0);
+
+    if (!result) {
+      Logger.log(`シフトID ${shiftId} が見つかりません`);
+      return false;
+    }
+
+    const rowData = [
+      shiftId,
+      shiftData.name !== undefined ? shiftData.name : result.data[1],
+      shiftData.startTime !== undefined ? shiftData.startTime : result.data[2],
+      shiftData.endTime !== undefined ? shiftData.endTime : result.data[3]
+    ];
+
+    this.updateRow(result.rowIndex, rowData);
+    return true;
+  }
+
+  /**
+   * シフトを削除
+   * @param {string} shiftId - シフトID
+   * @returns {boolean} 成功したかどうか
+   */
+  deleteShift(shiftId) {
+    const result = this.findById(shiftId, 0);
+
+    if (!result) {
+      Logger.log(`シフトID ${shiftId} が見つかりません`);
+      return false;
+    }
+
+    this.deleteRow(result.rowIndex);
+    return true;
+  }
 }
 
 /**
