@@ -14,19 +14,29 @@
 function doGet(e) {
   try {
     Logger.log('doGet started');
+    Logger.log('Page parameter: ' + (e.parameter ? e.parameter.page : 'none'));
 
     // セッション情報の確認
     const userProperties = PropertiesService.getUserProperties();
     const sessionUser = userProperties.getProperty('sessionUser');
 
-    // ログイン画面かダッシュボードを表示
-    if (!sessionUser && (!e.parameter.page || e.parameter.page === 'login')) {
+    Logger.log('Session user: ' + (sessionUser ? 'exists' : 'null'));
+
+    // ページパラメータを取得
+    const page = e.parameter ? e.parameter.page : null;
+
+    // ログイン画面は常に表示可能
+    if (!page || page === 'login') {
+      return renderPage('Login');
+    }
+
+    // それ以外のページはログインが必要
+    if (!sessionUser) {
+      Logger.log('Session not found, redirecting to login');
       return renderPage('Login');
     }
 
     // ページパラメータに基づいてルーティング
-    const page = e.parameter.page || 'Login';
-
     switch(page) {
       case 'staff':
         return renderPage('StaffDashboard');
@@ -101,6 +111,14 @@ function renderPage(pageName) {
  */
 function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
+/**
+ * スクリプトのURLを取得（クライアント側から呼び出し）
+ * @returns {string} スクリプトURL
+ */
+function getScriptUrl() {
+  return ScriptApp.getService().getUrl();
 }
 
 /**

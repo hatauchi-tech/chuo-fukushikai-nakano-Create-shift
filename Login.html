@@ -130,16 +130,22 @@
       // GAS側のauthenticateUser関数を呼び出し
       google.script.run
         .withSuccessHandler(function(result) {
-          showLoading(false);
-
           if (result.success) {
-            // ログイン成功 - ロールに応じてリダイレクト
-            if (result.data.role === '管理者') {
-              window.top.location.href = '?page=leader';
-            } else {
-              window.top.location.href = '?page=staff';
-            }
+            // ログイン成功 - スクリプトURLを取得して遷移
+            google.script.run
+              .withSuccessHandler(function(scriptUrl) {
+                // ロールに応じてページパラメータを設定
+                const page = result.data.role === '管理者' ? 'leader' : 'staff';
+                // 完全なURLで遷移
+                window.top.location.href = scriptUrl + '?page=' + page;
+              })
+              .withFailureHandler(function(error) {
+                showLoading(false);
+                showError('URL取得エラー: ' + error.message);
+              })
+              .getScriptUrl();
           } else {
+            showLoading(false);
             showError(result.error);
           }
         })
