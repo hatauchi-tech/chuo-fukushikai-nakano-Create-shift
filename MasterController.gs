@@ -257,26 +257,16 @@ function deleteStaff(staffId) {
  */
 function getAllShiftsForAdmin() {
   try {
-    Logger.log('getAllShiftsForAdmin: 開始');
-
     const user = getSessionUser();
-    Logger.log('getAllShiftsForAdmin: user = ' + JSON.stringify(user));
-
     if (!user || user.role !== '管理者') {
-      Logger.log('getAllShiftsForAdmin: 管理者権限チェック失敗');
       return {
         success: false,
         error: '管理者権限が必要です'
       };
     }
 
-    Logger.log('getAllShiftsForAdmin: ShiftModelインスタンス化開始');
     const shiftModel = new ShiftModel();
-    Logger.log('getAllShiftsForAdmin: ShiftModelインスタンス化成功');
-
-    Logger.log('getAllShiftsForAdmin: getAllShifts呼び出し開始');
     const shifts = shiftModel.getAllShifts();
-    Logger.log('getAllShiftsForAdmin: getAllShifts呼び出し成功。shifts.length = ' + shifts.length);
 
     return {
       success: true,
@@ -285,7 +275,6 @@ function getAllShiftsForAdmin() {
 
   } catch (error) {
     Logger.log('全シフト取得エラー: ' + error.toString());
-    Logger.log('エラースタック: ' + error.stack);
     return {
       success: false,
       error: error.toString()
