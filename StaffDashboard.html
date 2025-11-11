@@ -1449,7 +1449,7 @@
     }
 
     // 休み希望提出
-    async function submitRequest() {
+    function submitRequest() {
       if (selectedDates.size === 0) {
         showMessage('休み希望日を選択してください', 'warning');
         return;
@@ -1458,32 +1458,22 @@
       const dates = Array.from(selectedDates);
       const notes = document.getElementById('notes').value;
 
-      const data = {
-        action: 'submitRequest',
-        dates: JSON.stringify(dates),
-        notes: notes
-      };
-
-      try {
-        const response = await fetch(window.location.href, {
-          method: 'POST',
-          body: new URLSearchParams(data)
-        });
-
-        const result = await response.json();
-
-        if (result.success) {
-          showMessage('休み希望を提出しました', 'success');
-        } else {
-          showMessage('エラー: ' + result.error, 'error');
-        }
-      } catch (error) {
-        showMessage('通信エラー: ' + error.message, 'error');
-      }
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            showMessage('休み希望を提出しました', 'success');
+          } else {
+            showMessage('エラー: ' + result.error, 'error');
+          }
+        })
+        .withFailureHandler(function(error) {
+          showMessage('通信エラー: ' + error.message, 'error');
+        })
+        .submitRequestForClient(dates, notes);
     }
 
     // シフト生成（管理者のみ）
-    async function generateShift() {
+    function generateShift() {
       const targetMonth = document.getElementById('shiftTargetMonth').value;
       const groups = Array.from(document.querySelectorAll('input[name="targetGroups"]:checked'))
         .map(cb => cb.value);
@@ -1497,42 +1487,32 @@
         return;
       }
 
-      const data = {
-        action: 'generateShift',
-        yearMonth: targetMonth,
-        groups: groups.join(',')
-      };
+      showMessage('シフトを生成中です... しばらくお待ちください', 'info');
 
-      try {
-        showMessage('シフトを生成中です... しばらくお待ちください', 'info');
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            currentTableId = result.data.tableId;
+            currentShiftData = result.data.shifts;
 
-        const response = await fetch(window.location.href, {
-          method: 'POST',
-          body: new URLSearchParams(data)
-        });
+            showMessage('シフト生成が完了しました', 'success');
 
-        const result = await response.json();
+            if (result.data.feedback && result.data.feedback !== '特になし') {
+              document.getElementById('feedbackText').textContent = result.data.feedback;
+              document.getElementById('feedback').classList.remove('hidden');
+            }
 
-        if (result.success) {
-          currentTableId = result.data.tableId;
-          currentShiftData = result.data.shifts;
+            renderShiftTable(targetMonth, result.data.shifts);
+            document.getElementById('exportButton').disabled = false;
 
-          showMessage('シフト生成が完了しました', 'success');
-
-          if (result.data.feedback && result.data.feedback !== '特になし') {
-            document.getElementById('feedbackText').textContent = result.data.feedback;
-            document.getElementById('feedback').classList.remove('hidden');
+          } else {
+            showMessage('エラー: ' + result.error, 'error');
           }
-
-          renderShiftTable(targetMonth, result.data.shifts);
-          document.getElementById('exportButton').disabled = false;
-
-        } else {
-          showMessage('エラー: ' + result.error, 'error');
-        }
-      } catch (error) {
-        showMessage('通信エラー: ' + error.message, 'error');
-      }
+        })
+        .withFailureHandler(function(error) {
+          showMessage('通信エラー: ' + error.message, 'error');
+        })
+        .generateShiftForAdmin(targetMonth, groups.join(','));
     }
 
     // シフト表表示
@@ -1596,7 +1576,7 @@
     }
 
     // PDF出力
-    async function exportPdf() {
+    function exportPdf() {
       if (!currentTableId) {
         showMessage('シフト表が生成されていません', 'warning');
         return;
@@ -1606,40 +1586,31 @@
         return;
       }
 
-      const data = {
-        action: 'exportPdf',
-        tableId: currentTableId
-      };
+      showMessage('PDF出力中...', 'info');
 
-      try {
-        showMessage('PDF出力中...', 'info');
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            showMessage('PDF出力が完了しました: ' + result.data.fileName, 'success');
 
-        const response = await fetch(window.location.href, {
-          method: 'POST',
-          body: new URLSearchParams(data)
-        });
+            const link = document.createElement('a');
+            link.href = result.data.filePath;
+            link.target = '_blank';
+            link.textContent = 'PDFを開く';
+            link.className = 'text-blue-600 underline ml-2';
 
-        const result = await response.json();
+            const messageDiv = document.getElementById('message');
+            messageDiv.appendChild(document.createElement('br'));
+            messageDiv.appendChild(link);
 
-        if (result.success) {
-          showMessage('PDF出力が完了しました: ' + result.data.fileName, 'success');
-
-          const link = document.createElement('a');
-          link.href = result.data.filePath;
-          link.target = '_blank';
-          link.textContent = 'PDFを開く';
-          link.className = 'text-blue-600 underline ml-2';
-
-          const messageDiv = document.getElementById('message');
-          messageDiv.appendChild(document.createElement('br'));
-          messageDiv.appendChild(link);
-
-        } else {
-          showMessage('エラー: ' + result.error, 'error');
-        }
-      } catch (error) {
-        showMessage('通信エラー: ' + error.message, 'error');
-      }
+          } else {
+            showMessage('エラー: ' + result.error, 'error');
+          }
+        })
+        .withFailureHandler(function(error) {
+          showMessage('通信エラー: ' + error.message, 'error');
+        })
+        .exportPdfForAdmin(currentTableId);
     }
 
     // メッセージ表示
