@@ -85,24 +85,8 @@ ${staffInfo}
 ${rulesText}
 
 ## 出力形式
-以下のJSON形式で出力してください。各職員の各日のシフトを指定してください。
-
-\`\`\`json
-{
-  "shifts": {
-    "職員名1": {
-      "2024/01/01": "早出",
-      "2024/01/02": "日勤",
-      "2024/01/03": "休み",
-      ...
-    },
-    "職員名2": {
-      ...
-    }
-  },
-  "feedback": "ルールを適用できなかった点や注意事項があればここに記載"
-}
-\`\`\`
+以下の形式で、純粋なJSON形式のみで出力してください。日付はYYYY/MM/DD形式で指定してください：
+{"shifts":{"職員名1":{"YYYY/MM/DD":"シフト種別"},"職員名2":{...}},"feedback":"注意事項"}
 
 ## シフト種別
 - 早出
@@ -169,6 +153,15 @@ ${rulesText}
       throw new Error('APIから有効な応答が得られませんでした');
     }
 
+    // レスポンスの完全性をチェック
+    const candidate = jsonResponse.candidates[0];
+    if (candidate.finishReason && candidate.finishReason !== 'STOP') {
+      Logger.log('警告: レスポンスが途中で終了しました。理由: ' + candidate.finishReason);
+      if (candidate.finishReason === 'MAX_TOKENS') {
+        Logger.log('トークン数の上限に達しました。maxOutputTokensの増加を検討してください。');
+      }
+    }
+
     return jsonResponse;
   }
 
@@ -183,7 +176,9 @@ ${rulesText}
   _parseResponse(response, staffs, dates) {
     try {
       const content = response.candidates[0].content.parts[0].text;
-      Logger.log('APIレスポンステキスト: ' + content.substring(0, 500) + '...');
+      Logger.log('APIレスポンス長: ' + content.length + ' 文字');
+      Logger.log('APIレスポンステキスト（最初の500文字）: ' + content.substring(0, 500));
+      Logger.log('APIレスポンステキスト（最後の200文字）: ' + content.substring(Math.max(0, content.length - 200)));
 
       // JSONブロックを抽出（より堅牢な方法）
       let jsonText = content.trim();
