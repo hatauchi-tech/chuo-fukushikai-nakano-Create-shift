@@ -116,7 +116,8 @@ ${rulesText}
 2. 休み希望は最優先で反映してください
 3. ルールに従ってシフトを作成してください
 4. ルールを完全に守れない場合は、feedbackフィールドにその理由を記載してください
-5. 必ずJSON形式で出力してください（説明文は不要です）
+5. **必ず純粋なJSON形式のみで出力してください（マークダウンのコードブロック記号やその他の説明文は一切含めないでください）**
+6. 出力の最初の文字は必ず「{」で、最後の文字は必ず「}」にしてください
 
 それでは、シフトを作成してください。`;
 
@@ -184,14 +185,21 @@ ${rulesText}
       const content = response.candidates[0].content.parts[0].text;
       Logger.log('APIレスポンステキスト: ' + content.substring(0, 500) + '...');
 
-      // JSONブロックを抽出
-      const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/) ||
-                       content.match(/```\s*([\s\S]*?)\s*```/) ||
-                       [null, content];
+      // JSONブロックを抽出（より堅牢な方法）
+      let jsonText = content.trim();
 
-      const jsonText = jsonMatch[1] || content;
+      // ```json ... ``` または ``` ... ``` のパターンを除去
+      if (jsonText.startsWith('```json')) {
+        jsonText = jsonText.replace(/^```json\s*/i, '').replace(/\s*```\s*$/i, '');
+      } else if (jsonText.startsWith('```')) {
+        jsonText = jsonText.replace(/^```\s*/, '').replace(/\s*```\s*$/, '');
+      }
 
-      const parsedData = JSON.parse(jsonText.trim());
+      jsonText = jsonText.trim();
+
+      Logger.log('パース対象のJSONテキスト（最初の200文字）: ' + jsonText.substring(0, 200));
+
+      const parsedData = JSON.parse(jsonText);
 
       if (!parsedData.shifts) {
         throw new Error('shifts フィールドが見つかりません');
