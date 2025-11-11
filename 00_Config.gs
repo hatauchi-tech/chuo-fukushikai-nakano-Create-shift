@@ -39,11 +39,17 @@ class Config {
    * @returns {string} APIキー
    */
   getGeminiApiKey() {
-    const key = this.scriptProperties.getProperty('GEMINI_API_KEY');
-    if (!key) {
-      throw new Error('GEMINI_API_KEYが設定されていません。スクリプトプロパティを確認してください。');
+    try {
+      const key = this.scriptProperties.getProperty('GEMINI_API_KEY');
+      if (!key) {
+        Logger.log('エラー: GEMINI_API_KEYが設定されていません');
+        throw new Error('GEMINI_API_KEYが設定されていません。Config.setProperties()を実行してスクリプトプロパティを設定してください。');
+      }
+      return key;
+    } catch (error) {
+      Logger.log('getGeminiApiKeyでエラー: ' + error.message);
+      throw error;
     }
-    return key;
   }
 
   /**

@@ -23,10 +23,24 @@ class GeminiService {
    */
   generateShift(params) {
     try {
-      Logger.log('Gemini APIでシフト生成を開始します');
+      Logger.log('=== Gemini APIでシフト生成を開始 ===');
+      Logger.log(`職員数: ${params.staffs.length}、日数: ${params.dates.length}`);
+
+      // APIキーの確認
+      if (!this.apiKey || this.apiKey === '') {
+        Logger.log('エラー: Gemini APIキーが設定されていません');
+        return {
+          success: false,
+          error: 'Gemini APIキーが設定されていません。スクリプトプロパティを確認してください。',
+          feedback: 'APIキーが未設定です'
+        };
+      }
+
+      Logger.log('APIキー確認: OK (先頭10文字: ' + this.apiKey.substring(0, 10) + '...)');
+      Logger.log('使用モデル: ' + this.model);
 
       const prompt = this._buildPrompt(params);
-      Logger.log('プロンプトを作成しました');
+      Logger.log('プロンプトを作成しました（長さ: ' + prompt.length + '文字）');
 
       const response = this._callGeminiApi(prompt);
       Logger.log('Gemini APIから応答を受信しました');
@@ -37,11 +51,13 @@ class GeminiService {
       return result;
 
     } catch (error) {
-      Logger.log('Gemini APIエラー: ' + error.toString());
+      Logger.log('=== Gemini APIエラー ===');
+      Logger.log('エラーメッセージ: ' + error.message);
+      Logger.log('エラースタック: ' + error.stack);
       return {
         success: false,
-        error: error.toString(),
-        feedback: 'APIの呼び出しに失敗しました: ' + error.toString()
+        error: error.message,
+        feedback: 'APIの呼び出しに失敗しました: ' + error.message
       };
     }
   }
@@ -154,21 +170,46 @@ ${rulesText}
     };
 
     Logger.log('Gemini APIを呼び出しています...');
+    Logger.log('エンドポイント: ' + this.endpoint);
 
-    const response = UrlFetchApp.fetch(url, options);
-    const statusCode = response.getResponseCode();
+    try {
+      const response = UrlFetchApp.fetch(url, options);
+      const statusCode = response.getResponseCode();
+      const contentText = response.getContentText();
 
-    if (statusCode !== 200) {
-      throw new Error(`API Error: ${statusCode} - ${response.getContentText()}`);
+      Logger.log('HTTPステータスコード: ' + statusCode);
+
+      if (statusCode !== 200) {
+        Logger.log('APIエラーレスポンス: ' + contentText);
+
+        // エラーレスポンスをパースして詳細を取得
+        try {
+          const errorJson = JSON.parse(contentText);
+          const errorMessage = errorJson.error?.message || contentText;
+          throw new Error(`API Error (${statusCode}): ${errorMessage}`);
+        } catch (parseError) {
+          throw new Error(`API Error (${statusCode}): ${contentText}`);
+        }
+      }
+
+      Logger.log('レスポンス受信成功（長さ: ' + contentText.length + '文字）');
+
+      const jsonResponse = JSON.parse(contentText);
+
+      if (!jsonResponse.candidates || jsonResponse.candidates.length === 0) {
+        Logger.log('エラー: 応答にcandidatesが含まれていません');
+        Logger.log('レスポンス全体: ' + JSON.stringify(jsonResponse).substring(0, 500));
+        throw new Error('APIから有効な応答が得られませんでした。レスポンス: ' + JSON.stringify(jsonResponse));
+      }
+
+      Logger.log('候補数: ' + jsonResponse.candidates.length);
+
+      return jsonResponse;
+
+    } catch (error) {
+      Logger.log('API呼び出しでエラー: ' + error.message);
+      throw error;
     }
-
-    const jsonResponse = JSON.parse(response.getContentText());
-
-    if (!jsonResponse.candidates || jsonResponse.candidates.length === 0) {
-      throw new Error('APIから有効な応答が得られませんでした');
-    }
-
-    return jsonResponse;
   }
 
   /**

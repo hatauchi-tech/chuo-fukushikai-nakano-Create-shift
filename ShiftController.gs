@@ -11,10 +11,15 @@
  */
 function handleGenerateShift(e) {
   try {
-    Logger.log('シフト自動生成を開始します');
+    Logger.log('=== シフト自動生成を開始します ===');
+    Logger.log('パラメータ: ' + JSON.stringify(e.parameter));
 
+    // セッションチェック
     const user = getSessionUser();
+    Logger.log('セッションユーザー: ' + (user ? user.name : 'null'));
+
     if (!user || user.role !== '管理者') {
+      Logger.log('権限エラー: 管理者権限が必要です');
       return createJsonResponse(false, '管理者権限が必要です');
     }
 
@@ -22,6 +27,7 @@ function handleGenerateShift(e) {
     const groups = parseEnumList(e.parameter.groups || '');
 
     if (!yearMonthStr || groups.length === 0) {
+      Logger.log('パラメータエラー: 年月またはグループが未指定');
       return createJsonResponse(false, '年月とグループを指定してください');
     }
 
@@ -32,16 +38,20 @@ function handleGenerateShift(e) {
     Logger.log(`対象: ${year}年${month}月、グループ: ${groups.join(',')}`);
 
     // 1. 職員データを取得
+    Logger.log('STEP 1: 職員データを取得中...');
     const staffModel = new StaffModel();
     const staffs = staffModel.getStaffsByGroup(groups);
 
     if (staffs.length === 0) {
+      Logger.log('エラー: 対象の職員が見つかりません');
       return createJsonResponse(false, '対象の職員が見つかりません');
     }
 
-    Logger.log(`対象職員数: ${staffs.length}`);
+    Logger.log(`対象職員数: ${staffs.length}人`);
+    Logger.log('職員名: ' + staffs.map(s => s.name).join(', '));
 
     // 2. 休み希望を取得
+    Logger.log('STEP 2: 休み希望を取得中...');
     const requestDetailModel = new RequestDetailModel();
     const requests = {};
 
@@ -52,15 +62,18 @@ function handleGenerateShift(e) {
     });
 
     // 3. 対象日付を生成
+    Logger.log('STEP 3: 対象日付を生成中...');
     const dates = getMonthDates(year, month);
+    Logger.log(`対象日数: ${dates.length}日`);
 
     // 4. ルールを取得
+    Logger.log('STEP 4: ルールを取得中...');
     const ruleModel = new RuleModel();
     const rulesText = ruleModel.getRulesText();
-
-    Logger.log('ルールテキストを取得しました');
+    Logger.log('ルールテキスト長: ' + rulesText.length + '文字');
 
     // 5. Gemini APIでシフト生成
+    Logger.log('STEP 5: Gemini APIでシフト生成中...');
     const geminiService = new GeminiService();
     const result = geminiService.generateShift({
       staffs: staffs,
@@ -71,12 +84,13 @@ function handleGenerateShift(e) {
 
     if (!result.success) {
       Logger.log('シフト生成失敗: ' + result.error);
-      return createJsonResponse(false, result.error);
+      return createJsonResponse(false, 'シフト生成失敗: ' + result.error);
     }
 
-    Logger.log('シフト生成成功');
+    Logger.log('シフト生成成功。生成されたシフト数: ' + result.data.length);
 
     // 6. シフト表を保存
+    Logger.log('STEP 6: シフト表を保存中...');
     const shiftTableModel = new ShiftTableModel();
     const tableId = shiftTableModel.addShiftTable({
       outputBy: user.name,
@@ -84,12 +98,14 @@ function handleGenerateShift(e) {
       groups: groups,
       filePath: '' // PDF出力時に更新
     });
+    Logger.log('シフト表ID: ' + tableId);
 
     // 7. シフト詳細を保存
+    Logger.log('STEP 7: シフト詳細を保存中...');
     const shiftTableDetailModel = new ShiftTableDetailModel();
     shiftTableDetailModel.addShiftDetails(tableId, result.data);
 
-    Logger.log('シフトをデータベースに保存しました');
+    Logger.log('=== シフト自動生成が完了しました ===');
 
     return createJsonResponse(true, {
       tableId: tableId,
@@ -98,8 +114,10 @@ function handleGenerateShift(e) {
     });
 
   } catch (error) {
-    Logger.log('シフト生成エラー: ' + error.toString());
-    return createJsonResponse(false, error.toString());
+    Logger.log('=== シフト生成エラー ===');
+    Logger.log('エラーメッセージ: ' + error.message);
+    Logger.log('エラースタック: ' + error.stack);
+    return createJsonResponse(false, 'エラー: ' + error.message);
   }
 }
 
@@ -252,5 +270,147 @@ function getShiftData(tableId) {
       success: false,
       error: error.toString()
     };
+  }
+}
+
+/**
+ * デバッグ用: シフト生成の各ステップをテスト
+ * GASエディタから直接実行してログを確認
+ */
+function debugShiftGeneration() {
+  try {
+    Logger.log('=== デバッグ: シフト生成テスト開始 ===');
+
+    // STEP 1: Config確認
+    Logger.log('STEP 1: Config確認');
+    const config = new Config();
+    try {
+      const spreadsheetId = config.getSpreadsheetId();
+      Logger.log('  スプレッドシートID: OK');
+    } catch (e) {
+      Logger.log('  スプレッドシートID: NG - ' + e.message);
+      return;
+    }
+
+    try {
+      const apiKey = config.getGeminiApiKey();
+      Logger.log('  Gemini APIキー: OK (先頭10文字: ' + apiKey.substring(0, 10) + '...)');
+    } catch (e) {
+      Logger.log('  Gemini APIキー: NG - ' + e.message);
+      return;
+    }
+
+    // STEP 2: 職員データ確認
+    Logger.log('STEP 2: 職員データ確認');
+    const staffModel = new StaffModel();
+    const allStaffs = staffModel.getActiveStaffs();
+    Logger.log('  有効な職員数: ' + allStaffs.length);
+
+    if (allStaffs.length === 0) {
+      Logger.log('  警告: 職員データがありません。サンプルデータを投入してください。');
+      return;
+    }
+
+    // 最初のグループを取得
+    const firstGroup = allStaffs[0].groups[0];
+    Logger.log('  テスト用グループ: ' + firstGroup);
+
+    const groupStaffs = staffModel.getStaffsByGroup([firstGroup]);
+    Logger.log('  グループの職員数: ' + groupStaffs.length);
+
+    // STEP 3: ルール確認
+    Logger.log('STEP 3: ルール確認');
+    const ruleModel = new RuleModel();
+    const rules = ruleModel.getAllRules();
+    Logger.log('  ルール数: ' + rules.length);
+
+    if (rules.length === 0) {
+      Logger.log('  警告: ルールがありません。サンプルデータを投入してください。');
+      return;
+    }
+
+    // STEP 4: Gemini API接続テスト
+    Logger.log('STEP 4: Gemini API接続テスト');
+    const geminiService = new GeminiService();
+    try {
+      const testResult = geminiService.testApi();
+      Logger.log('  Gemini API接続: OK');
+      Logger.log('  応答: ' + testResult.substring(0, 100) + '...');
+    } catch (e) {
+      Logger.log('  Gemini API接続: NG - ' + e.message);
+      return;
+    }
+
+    Logger.log('=== すべてのテストをパスしました ===');
+    Logger.log('実際のシフト生成を実行する準備ができています。');
+
+  } catch (error) {
+    Logger.log('=== デバッグテストでエラー ===');
+    Logger.log('エラー: ' + error.message);
+    Logger.log('スタック: ' + error.stack);
+  }
+}
+
+/**
+ * デバッグ用: 簡易シフト生成テスト（2人、3日間のみ）
+ * GASエディタから直接実行してログを確認
+ */
+function debugSimpleShiftGeneration() {
+  try {
+    Logger.log('=== 簡易シフト生成テスト開始 ===');
+
+    // テスト用の最小データでシフト生成
+    const staffModel = new StaffModel();
+    const allStaffs = staffModel.getActiveStaffs();
+
+    if (allStaffs.length === 0) {
+      Logger.log('エラー: 職員データがありません');
+      return;
+    }
+
+    // 最初の2人のみ
+    const staffs = allStaffs.slice(0, Math.min(2, allStaffs.length));
+    Logger.log('テスト職員: ' + staffs.map(s => s.name).join(', '));
+
+    // 3日分の日付
+    const today = new Date();
+    const dates = [
+      new Date(today.getFullYear(), today.getMonth(), 1),
+      new Date(today.getFullYear(), today.getMonth(), 2),
+      new Date(today.getFullYear(), today.getMonth(), 3)
+    ];
+
+    // 休み希望は空
+    const requests = {};
+    staffs.forEach(s => requests[s.name] = []);
+
+    // シンプルなルール
+    const rulesText = `
+【ルール1】基本ルール
+- 早出、日勤、遅出、夜勤、休みのいずれかを割り当ててください
+- すべての職員に公平にシフトを配分してください
+    `;
+
+    const geminiService = new GeminiService();
+    const result = geminiService.generateShift({
+      staffs: staffs,
+      requests: requests,
+      dates: dates,
+      rulesText: rulesText
+    });
+
+    if (result.success) {
+      Logger.log('=== シフト生成成功 ===');
+      Logger.log('生成されたシフト数: ' + result.data.length);
+      Logger.log('最初の3件: ' + JSON.stringify(result.data.slice(0, 3), null, 2));
+    } else {
+      Logger.log('=== シフト生成失敗 ===');
+      Logger.log('エラー: ' + result.error);
+    }
+
+  } catch (error) {
+    Logger.log('=== 簡易テストでエラー ===');
+    Logger.log('エラー: ' + error.message);
+    Logger.log('スタック: ' + error.stack);
   }
 }
