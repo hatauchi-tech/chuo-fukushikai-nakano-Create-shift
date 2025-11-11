@@ -37,12 +37,13 @@ function doGet(e) {
     }
 
     // ページパラメータに基づいてルーティング
-    // staff/leader/masterすべてStaffDashboard（SPA）を表示
     switch(page) {
       case 'staff':
-      case 'leader':
-      case 'master':
         return renderPage('StaffDashboard');
+      case 'leader':
+        return renderPage('LeaderDashboard');
+      case 'master':
+        return renderPage('MasterManagement');
       default:
         return renderPage('Login');
     }

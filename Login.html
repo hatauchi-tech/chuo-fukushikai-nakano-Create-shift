@@ -131,17 +131,10 @@
       google.script.run
         .withSuccessHandler(function(result) {
           if (result.success) {
-            // ログイン成功 - スクリプトURLを取得して遷移
-            // 管理者も一般も、まず休み希望提出画面（staff）に遷移
-            google.script.run
-              .withSuccessHandler(function(scriptUrl) {
-                window.top.location.href = scriptUrl + '?page=staff';
-              })
-              .withFailureHandler(function(error) {
-                showLoading(false);
-                showError('URL取得エラー: ' + error.message);
-              })
-              .getScriptUrl();
+            // ログイン成功 - ページ遷移
+            // 管理者の場合はリーダー画面、一般の場合はスタッフ画面へ
+            const redirectPage = result.data.role === '管理者' ? 'leader' : 'staff';
+            window.location.href = '?page=' + redirectPage;
           } else {
             showLoading(false);
             showError(result.error);
