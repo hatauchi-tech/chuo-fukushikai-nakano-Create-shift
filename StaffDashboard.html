@@ -1339,7 +1339,7 @@
               // スクリプトURLを取得してログイン画面に遷移
               google.script.run
                 .withSuccessHandler(function(scriptUrl) {
-                  window.top.location.href = scriptUrl + '?page=login';
+                  window.location.href = scriptUrl + '?page=login';
                 })
                 .getScriptUrl();
             }
