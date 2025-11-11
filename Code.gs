@@ -84,6 +84,9 @@ function doPost(e) {
       case 'generateShift':
         Logger.log('Routing to: handleGenerateShift');
         return handleGenerateShift(e);
+      case 'confirmShift':
+        Logger.log('Routing to: handleConfirmShift');
+        return handleConfirmShift(e);
       case 'updateShift':
         Logger.log('Routing to: handleUpdateShift');
         return handleUpdateShift(e);

@@ -89,8 +89,77 @@ function handleGenerateShift(e) {
 
     Logger.log('シフト生成成功。生成されたシフト数: ' + result.data.length);
 
-    // 6. シフト表を保存
-    Logger.log('STEP 6: シフト表を保存中...');
+    // 6. 職員情報を取得（資格者情報を含む）
+    Logger.log('STEP 6: 職員情報を整形中...');
+    const staffsInfo = staffs.map(staff => ({
+      name: staff.name,
+      isSuctionCertified: staff.isSuctionCertified
+    }));
+
+    // 7. 休み希望情報を整形
+    Logger.log('STEP 7: 休み希望情報を整形中...');
+    const requestDates = {};
+    for (const staffName in requests) {
+      requestDates[staffName] = requests[staffName].map(date => formatDate(date));
+    }
+
+    Logger.log('=== シフト自動生成が完了しました（確定待ち） ===');
+
+    // スプレッドシートには保存せず、データのみ返す
+    return createJsonResponse(true, {
+      shifts: result.data,
+      feedback: result.feedback,
+      staffs: staffsInfo,
+      requestDates: requestDates,
+      yearMonth: formatDate(yearMonth),
+      groups: groups
+    });
+
+  } catch (error) {
+    Logger.log('=== シフト生成エラー ===');
+    Logger.log('エラーメッセージ: ' + error.message);
+    Logger.log('エラースタック: ' + error.stack);
+    return createJsonResponse(false, 'エラー: ' + error.message);
+  }
+}
+
+/**
+ * シフト確定処理（スプレッドシートに保存）
+ * @param {Object} e - イベントオブジェクト
+ * @returns {ContentService.TextOutput} JSONレスポンス
+ */
+function handleConfirmShift(e) {
+  try {
+    Logger.log('=== シフト確定処理を開始します ===');
+    Logger.log('パラメータ: ' + JSON.stringify(e.parameter));
+
+    // セッションチェック
+    const user = getSessionUser();
+    Logger.log('セッションユーザー: ' + (user ? user.name : 'null'));
+
+    if (!user || user.role !== '管理者') {
+      Logger.log('権限エラー: 管理者権限が必要です');
+      return createJsonResponse(false, '管理者権限が必要です');
+    }
+
+    const yearMonthStr = e.parameter.yearMonth; // "YYYY/MM/DD" 形式（月初日）
+    const groups = parseEnumList(e.parameter.groups || '');
+    const shiftsJson = e.parameter.shifts; // JSON文字列
+
+    if (!yearMonthStr || groups.length === 0 || !shiftsJson) {
+      Logger.log('パラメータエラー: 必要なパラメータが未指定');
+      return createJsonResponse(false, '必要なパラメータが指定されていません');
+    }
+
+    // シフトデータをパース
+    const shifts = JSON.parse(shiftsJson);
+    Logger.log(`確定するシフト数: ${shifts.length}`);
+
+    // 年月を復元
+    const yearMonth = parseDate(yearMonthStr);
+
+    // 1. シフト表を保存
+    Logger.log('STEP 1: シフト表を保存中...');
     const shiftTableModel = new ShiftTableModel();
     const tableId = shiftTableModel.addShiftTable({
       outputBy: user.name,
@@ -100,21 +169,28 @@ function handleGenerateShift(e) {
     });
     Logger.log('シフト表ID: ' + tableId);
 
-    // 7. シフト詳細を保存
-    Logger.log('STEP 7: シフト詳細を保存中...');
+    // 2. シフト詳細を保存
+    Logger.log('STEP 2: シフト詳細を保存中...');
     const shiftTableDetailModel = new ShiftTableDetailModel();
-    shiftTableDetailModel.addShiftDetails(tableId, result.data);
 
-    Logger.log('=== シフト自動生成が完了しました ===');
+    // shifts配列の各要素に date を Date オブジェクトに変換
+    const shiftsToSave = shifts.map(shift => ({
+      date: parseDate(shift.date),
+      staffName: shift.staffName,
+      shiftName: shift.shiftName
+    }));
+
+    shiftTableDetailModel.addShiftDetails(tableId, shiftsToSave);
+
+    Logger.log('=== シフト確定が完了しました ===');
 
     return createJsonResponse(true, {
       tableId: tableId,
-      shifts: result.data,
-      feedback: result.feedback
+      message: 'シフトを確定しました'
     });
 
   } catch (error) {
-    Logger.log('=== シフト生成エラー ===');
+    Logger.log('=== シフト確定エラー ===');
     Logger.log('エラーメッセージ: ' + error.message);
     Logger.log('エラースタック: ' + error.stack);
     return createJsonResponse(false, 'エラー: ' + error.message);

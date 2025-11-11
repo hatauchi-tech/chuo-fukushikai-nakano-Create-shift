@@ -90,21 +90,30 @@
     </div>
 
     <!-- シフト表示・編集セクション -->
-    <div class="bg-white rounded-lg shadow p-6 mb-6">
+    <div id="shiftSection" class="bg-white rounded-lg shadow p-6 mb-6 hidden">
       <div class="flex justify-between items-center mb-4">
-        <h2 class="text-lg font-bold">シフト表</h2>
-        <button
-          onclick="exportPdf()"
-          id="exportButton"
-          class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-          disabled
-        >
-          PDF出力
-        </button>
+        <h2 class="text-lg font-bold">シフト表（確認・編集）</h2>
+        <div class="space-x-2">
+          <button
+            onclick="confirmShift()"
+            id="confirmButton"
+            class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 font-medium"
+          >
+            シフトを確定
+          </button>
+          <button
+            onclick="exportPdf()"
+            id="exportButton"
+            class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            disabled
+          >
+            PDF出力
+          </button>
+        </div>
       </div>
 
       <div id="shiftTableContainer" class="overflow-x-auto">
-        <p class="text-gray-500 text-center py-8">シフトを生成してください</p>
+        <!-- シフト表がここに動的に生成されます -->
       </div>
     </div>
 
@@ -115,6 +124,10 @@
   <script>
     let currentTableId = null;
     let currentShiftData = [];
+    let currentStaffsInfo = [];
+    let currentRequestDates = {};
+    let currentYearMonth = '';
+    let currentGroups = [];
 
     // 初期化
     window.onload = function() {
@@ -156,22 +169,32 @@
         const result = await response.json();
 
         if (result.success) {
-          currentTableId = result.data.tableId;
+          // データを保持
           currentShiftData = result.data.shifts;
+          currentStaffsInfo = result.data.staffs;
+          currentRequestDates = result.data.requestDates;
+          currentYearMonth = result.data.yearMonth;
+          currentGroups = result.data.groups;
 
-          showMessage('シフト生成が完了しました', 'success');
+          showMessage('シフト生成が完了しました。内容を確認してください。', 'success');
 
           // フィードバック表示
           if (result.data.feedback && result.data.feedback !== '特になし') {
             document.getElementById('feedbackText').textContent = result.data.feedback;
             document.getElementById('feedback').classList.remove('hidden');
+          } else {
+            document.getElementById('feedback').classList.add('hidden');
           }
 
           // シフト表を表示
-          renderShiftTable(targetMonth, result.data.shifts);
+          renderShiftTable(targetMonth, result.data.shifts, result.data.staffs, result.data.requestDates);
 
-          // PDF出力ボタンを有効化
-          document.getElementById('exportButton').disabled = false;
+          // シフトセクションを表示
+          document.getElementById('shiftSection').classList.remove('hidden');
+
+          // PDF出力ボタンは無効のまま（確定後に有効化）
+          document.getElementById('exportButton').disabled = true;
+          document.getElementById('confirmButton').disabled = false;
 
         } else {
           showMessage('エラー: ' + result.error, 'error');
@@ -181,7 +204,7 @@
       }
     }
 
-    function renderShiftTable(yearMonth, shifts) {
+    function renderShiftTable(yearMonth, shifts, staffs, requestDates) {
       const [year, month] = yearMonth.split('-').map(Number);
       const daysInMonth = new Date(year, month, 0).getDate();
 
@@ -194,13 +217,14 @@
         shiftByStaff[shift.staffName][shift.date] = shift.shiftName;
       });
 
-      const staffNames = Object.keys(shiftByStaff);
+      // 職員名の配列を作成（資格者情報を含む）
+      const staffNames = staffs.map(s => s.name);
 
-      // テーブルHTML生成
+      // テーブルHTML生成（横：日付、縦：職員）
       let html = '<table class="min-w-full border-collapse border border-gray-300 text-sm">';
 
-      // ヘッダー行
-      html += '<thead><tr class="bg-gray-200"><th class="border border-gray-300 p-2">氏名</th>';
+      // ヘッダー行（日付）
+      html += '<thead><tr class="bg-gray-200"><th class="border border-gray-300 p-2 sticky left-0 bg-gray-200 z-10">職員名</th>';
       for (let day = 1; day <= daysInMonth; day++) {
         const date = new Date(year, month - 1, day);
         const weekday = getJapaneseWeekday(date);
@@ -209,20 +233,32 @@
       }
       html += '</tr></thead>';
 
-      // データ行
+      // データ行（職員ごと）
       html += '<tbody>';
-      staffNames.forEach(staffName => {
-        html += `<tr><td class="border border-gray-300 p-2 font-medium">${staffName}</td>`;
+      staffs.forEach(staff => {
+        // 職員名（資格者ラベル付き）
+        const certLabel = staff.isSuctionCertified ? '<span class="ml-2 text-xs bg-green-500 text-white px-2 py-0.5 rounded">資格者</span>' : '';
+        html += `<tr><td class="border border-gray-300 p-2 font-medium sticky left-0 bg-white z-10">${staff.name}${certLabel}</td>`;
 
         for (let day = 1; day <= daysInMonth; day++) {
           const date = new Date(year, month - 1, day);
           const dateKey = formatDate(date);
-          const shiftName = shiftByStaff[staffName][dateKey] || '';
+          const shiftName = shiftByStaff[staff.name] ? (shiftByStaff[staff.name][dateKey] || '') : '';
 
-          html += `<td class="border border-gray-300 p-1">
+          // 休み希望かチェック
+          const isRequestedOff = requestDates[staff.name] && requestDates[staff.name].includes(dateKey);
+          const requestLabel = isRequestedOff ? '<div class="text-xs text-red-600 font-bold">休み希望</div>' : '';
+
+          const weekday = getJapaneseWeekday(date);
+          const bgColor = weekday === '日' ? 'bg-red-50' : weekday === '土' ? 'bg-blue-50' : '';
+
+          html += `<td class="border border-gray-300 p-1 ${bgColor}">
+            ${requestLabel}
             <select
               class="w-full text-xs"
-              onchange="updateShift('${staffName}', '${dateKey}', this.value)"
+              data-staff="${staff.name}"
+              data-date="${dateKey}"
+              onchange="updateShift('${staff.name}', '${dateKey}', this.value)"
             >
               <option value="" ${shiftName === '' ? 'selected' : ''}></option>
               <option value="早出" ${shiftName === '早出' ? 'selected' : ''}>早出</option>
@@ -246,15 +282,60 @@
       const index = currentShiftData.findIndex(s => s.staffName === staffName && s.date === date);
       if (index >= 0) {
         currentShiftData[index].shiftName = shiftName;
+      } else {
+        // 新規追加
+        currentShiftData.push({
+          staffName: staffName,
+          date: date,
+          shiftName: shiftName
+        });
       }
 
-      // 即座にサーバーに保存はせず、PDF出力時に保存
       console.log(`更新: ${staffName}, ${date}, ${shiftName}`);
+    }
+
+    async function confirmShift() {
+      if (!confirm('シフトを確定してスプレッドシートに保存しますか？\n（確定後、PDF出力が可能になります）')) {
+        return;
+      }
+
+      const data = {
+        action: 'confirmShift',
+        yearMonth: currentYearMonth,
+        groups: currentGroups.join(','),
+        shifts: JSON.stringify(currentShiftData)
+      };
+
+      try {
+        showMessage('シフトを確定中...', 'info');
+
+        const response = await fetch(window.location.href, {
+          method: 'POST',
+          body: new URLSearchParams(data)
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          currentTableId = result.data.tableId;
+          showMessage('シフトを確定しました。PDF出力が可能です。', 'success');
+
+          // PDF出力ボタンを有効化
+          document.getElementById('exportButton').disabled = false;
+          // 確定ボタンを無効化
+          document.getElementById('confirmButton').disabled = true;
+
+        } else {
+          showMessage('エラー: ' + result.error, 'error');
+        }
+      } catch (error) {
+        showMessage('通信エラー: ' + error.message, 'error');
+      }
     }
 
     async function exportPdf() {
       if (!currentTableId) {
-        showMessage('シフト表が生成されていません', 'warning');
+        showMessage('シフト表が確定されていません', 'warning');
         return;
       }
 
