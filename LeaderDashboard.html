@@ -157,6 +157,13 @@
 
       google.script.run
         .withSuccessHandler(function(result) {
+          console.log('サーバーからのレスポンス:', result);
+
+          if (!result) {
+            showMessage('エラー: サーバーから応答がありませんでした', 'error');
+            return;
+          }
+
           if (result.success) {
             currentShiftData = result.data.shifts;
             currentStaffInfo = result.data.staffInfo;
@@ -182,11 +189,12 @@
             document.getElementById('exportButton').disabled = true;
 
           } else {
-            showMessage('エラー: ' + result.error, 'error');
+            showMessage('エラー: ' + (result.error || '不明なエラー'), 'error');
           }
         })
         .withFailureHandler(function(error) {
-          showMessage('通信エラー: ' + error.message, 'error');
+          console.error('通信エラー:', error);
+          showMessage('通信エラー: ' + (error.message || error), 'error');
         })
         .generateShiftPreview(targetMonth, groups.join(','));
     }
