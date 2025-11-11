@@ -59,52 +59,35 @@ function doGet(e) {
  */
 function doPost(e) {
   try {
-    Logger.log('=== doPost started ===');
+    Logger.log('doPost started');
     Logger.log('Parameters: ' + JSON.stringify(e.parameter));
 
     const action = e.parameter.action;
-    Logger.log('Action: ' + action);
-
-    if (!action) {
-      Logger.log('エラー: actionパラメータが指定されていません');
-      return createJsonResponse(false, 'actionパラメータが必要です');
-    }
 
     // アクションに基づいてルーティング
     switch(action) {
       case 'login':
-        Logger.log('Routing to: handleLogin');
         return handleLogin(e);
       case 'logout':
-        Logger.log('Routing to: handleLogout');
         return handleLogout(e);
       case 'submitRequest':
-        Logger.log('Routing to: handleSubmitRequest');
         return handleSubmitRequest(e);
       case 'generateShift':
-        Logger.log('Routing to: handleGenerateShift');
         return handleGenerateShift(e);
       case 'updateShift':
-        Logger.log('Routing to: handleUpdateShift');
         return handleUpdateShift(e);
       case 'exportPdf':
-        Logger.log('Routing to: handleExportPdf');
         return handleExportPdf(e);
       case 'saveStaff':
-        Logger.log('Routing to: handleSaveStaff');
         return handleSaveStaff(e);
       case 'saveEvent':
-        Logger.log('Routing to: handleSaveEvent');
         return handleSaveEvent(e);
       default:
-        Logger.log('エラー: 無効なaction - ' + action);
-        return createJsonResponse(false, 'Invalid action: ' + action);
+        return createJsonResponse(false, 'Invalid action');
     }
   } catch (error) {
-    Logger.log('=== doPostでエラー ===');
-    Logger.log('エラーメッセージ: ' + error.message);
-    Logger.log('エラースタック: ' + error.stack);
-    return createJsonResponse(false, 'サーバーエラー: ' + error.message);
+    Logger.log('Error in doPost: ' + error.toString());
+    return createJsonResponse(false, error.toString());
   }
 }
 

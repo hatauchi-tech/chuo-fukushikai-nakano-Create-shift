@@ -23,24 +23,10 @@ class GeminiService {
    */
   generateShift(params) {
     try {
-      Logger.log('=== Gemini APIでシフト生成を開始 ===');
-      Logger.log(`職員数: ${params.staffs.length}、日数: ${params.dates.length}`);
-
-      // APIキーの確認
-      if (!this.apiKey || this.apiKey === '') {
-        Logger.log('エラー: Gemini APIキーが設定されていません');
-        return {
-          success: false,
-          error: 'Gemini APIキーが設定されていません。スクリプトプロパティを確認してください。',
-          feedback: 'APIキーが未設定です'
-        };
-      }
-
-      Logger.log('APIキー確認: OK (先頭10文字: ' + this.apiKey.substring(0, 10) + '...)');
-      Logger.log('使用モデル: ' + this.model);
+      Logger.log('Gemini APIでシフト生成を開始します');
 
       const prompt = this._buildPrompt(params);
-      Logger.log('プロンプトを作成しました（長さ: ' + prompt.length + '文字）');
+      Logger.log('プロンプトを作成しました');
 
       const response = this._callGeminiApi(prompt);
       Logger.log('Gemini APIから応答を受信しました');
@@ -51,13 +37,11 @@ class GeminiService {
       return result;
 
     } catch (error) {
-      Logger.log('=== Gemini APIエラー ===');
-      Logger.log('エラーメッセージ: ' + error.message);
-      Logger.log('エラースタック: ' + error.stack);
+      Logger.log('Gemini APIエラー: ' + error.toString());
       return {
         success: false,
-        error: error.message,
-        feedback: 'APIの呼び出しに失敗しました: ' + error.message
+        error: error.toString(),
+        feedback: 'APIの呼び出しに失敗しました: ' + error.toString()
       };
     }
   }
@@ -101,24 +85,8 @@ ${staffInfo}
 ${rulesText}
 
 ## 出力形式
-以下のJSON形式で出力してください。各職員の各日のシフトを指定してください。
-
-\`\`\`json
-{
-  "shifts": {
-    "職員名1": {
-      "2024/01/01": "早出",
-      "2024/01/02": "日勤",
-      "2024/01/03": "休み",
-      ...
-    },
-    "職員名2": {
-      ...
-    }
-  },
-  "feedback": "ルールを適用できなかった点や注意事項があればここに記載"
-}
-\`\`\`
+以下の形式で、純粋なJSON形式のみで出力してください。日付はYYYY/MM/DD形式で指定してください：
+{"shifts":{"職員名1":{"YYYY/MM/DD":"シフト種別"},"職員名2":{...}},"feedback":"注意事項"}
 
 ## シフト種別
 - 早出
@@ -132,7 +100,8 @@ ${rulesText}
 2. 休み希望は最優先で反映してください
 3. ルールに従ってシフトを作成してください
 4. ルールを完全に守れない場合は、feedbackフィールドにその理由を記載してください
-5. 必ずJSON形式で出力してください（説明文は不要です）
+5. **必ず純粋なJSON形式のみで出力してください（マークダウンのコードブロック記号やその他の説明文は一切含めないでください）**
+6. 出力の最初の文字は必ず「{」で、最後の文字は必ず「}」にしてください
 
 それでは、シフトを作成してください。`;
 
@@ -158,7 +127,7 @@ ${rulesText}
         temperature: 0.7,
         topK: 40,
         topP: 0.95,
-        maxOutputTokens: 8192,
+        maxOutputTokens: 65536,
       }
     };
 
@@ -170,46 +139,30 @@ ${rulesText}
     };
 
     Logger.log('Gemini APIを呼び出しています...');
-    Logger.log('エンドポイント: ' + this.endpoint);
 
-    try {
-      const response = UrlFetchApp.fetch(url, options);
-      const statusCode = response.getResponseCode();
-      const contentText = response.getContentText();
+    const response = UrlFetchApp.fetch(url, options);
+    const statusCode = response.getResponseCode();
 
-      Logger.log('HTTPステータスコード: ' + statusCode);
-
-      if (statusCode !== 200) {
-        Logger.log('APIエラーレスポンス: ' + contentText);
-
-        // エラーレスポンスをパースして詳細を取得
-        try {
-          const errorJson = JSON.parse(contentText);
-          const errorMessage = errorJson.error?.message || contentText;
-          throw new Error(`API Error (${statusCode}): ${errorMessage}`);
-        } catch (parseError) {
-          throw new Error(`API Error (${statusCode}): ${contentText}`);
-        }
-      }
-
-      Logger.log('レスポンス受信成功（長さ: ' + contentText.length + '文字）');
-
-      const jsonResponse = JSON.parse(contentText);
-
-      if (!jsonResponse.candidates || jsonResponse.candidates.length === 0) {
-        Logger.log('エラー: 応答にcandidatesが含まれていません');
-        Logger.log('レスポンス全体: ' + JSON.stringify(jsonResponse).substring(0, 500));
-        throw new Error('APIから有効な応答が得られませんでした。レスポンス: ' + JSON.stringify(jsonResponse));
-      }
-
-      Logger.log('候補数: ' + jsonResponse.candidates.length);
-
-      return jsonResponse;
-
-    } catch (error) {
-      Logger.log('API呼び出しでエラー: ' + error.message);
-      throw error;
+    if (statusCode !== 200) {
+      throw new Error(`API Error: ${statusCode} - ${response.getContentText()}`);
     }
+
+    const jsonResponse = JSON.parse(response.getContentText());
+
+    if (!jsonResponse.candidates || jsonResponse.candidates.length === 0) {
+      throw new Error('APIから有効な応答が得られませんでした');
+    }
+
+    // レスポンスの完全性をチェック
+    const candidate = jsonResponse.candidates[0];
+    if (candidate.finishReason && candidate.finishReason !== 'STOP') {
+      Logger.log('警告: レスポンスが途中で終了しました。理由: ' + candidate.finishReason);
+      if (candidate.finishReason === 'MAX_TOKENS') {
+        Logger.log('トークン数の上限に達しました。maxOutputTokensの増加を検討してください。');
+      }
+    }
+
+    return jsonResponse;
   }
 
   /**
@@ -223,16 +176,25 @@ ${rulesText}
   _parseResponse(response, staffs, dates) {
     try {
       const content = response.candidates[0].content.parts[0].text;
-      Logger.log('APIレスポンステキスト: ' + content.substring(0, 500) + '...');
+      Logger.log('APIレスポンス長: ' + content.length + ' 文字');
+      Logger.log('APIレスポンステキスト（最初の500文字）: ' + content.substring(0, 500));
+      Logger.log('APIレスポンステキスト（最後の200文字）: ' + content.substring(Math.max(0, content.length - 200)));
 
-      // JSONブロックを抽出
-      const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/) ||
-                       content.match(/```\s*([\s\S]*?)\s*```/) ||
-                       [null, content];
+      // JSONブロックを抽出（より堅牢な方法）
+      let jsonText = content.trim();
 
-      const jsonText = jsonMatch[1] || content;
+      // ```json ... ``` または ``` ... ``` のパターンを除去
+      if (jsonText.startsWith('```json')) {
+        jsonText = jsonText.replace(/^```json\s*/i, '').replace(/\s*```\s*$/i, '');
+      } else if (jsonText.startsWith('```')) {
+        jsonText = jsonText.replace(/^```\s*/, '').replace(/\s*```\s*$/, '');
+      }
 
-      const parsedData = JSON.parse(jsonText.trim());
+      jsonText = jsonText.trim();
+
+      Logger.log('パース対象のJSONテキスト（最初の200文字）: ' + jsonText.substring(0, 200));
+
+      const parsedData = JSON.parse(jsonText);
 
       if (!parsedData.shifts) {
         throw new Error('shifts フィールドが見つかりません');

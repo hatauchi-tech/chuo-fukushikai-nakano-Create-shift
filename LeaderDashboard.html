@@ -93,14 +93,24 @@
     <div class="bg-white rounded-lg shadow p-6 mb-6">
       <div class="flex justify-between items-center mb-4">
         <h2 class="text-lg font-bold">シフト表</h2>
-        <button
-          onclick="exportPdf()"
-          id="exportButton"
-          class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-          disabled
-        >
-          PDF出力
-        </button>
+        <div class="flex space-x-2">
+          <button
+            onclick="confirmShiftData()"
+            id="confirmButton"
+            class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            disabled
+          >
+            確定
+          </button>
+          <button
+            onclick="exportPdf()"
+            id="exportButton"
+            class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            disabled
+          >
+            PDF出力
+          </button>
+        </div>
       </div>
 
       <div id="shiftTableContainer" class="overflow-x-auto">
@@ -115,6 +125,10 @@
   <script>
     let currentTableId = null;
     let currentShiftData = [];
+    let currentStaffInfo = [];
+    let currentRequestDates = {};
+    let currentYearMonth = '';
+    let currentGroups = [];
 
     // 初期化
     window.onload = function() {
@@ -125,7 +139,7 @@
       document.getElementById('targetMonth').value = yearMonth;
     };
 
-    async function generateShift() {
+    function generateShift() {
       const targetMonth = document.getElementById('targetMonth').value;
       const groups = Array.from(document.querySelectorAll('input[name="targetGroups"]:checked'))
         .map(cb => cb.value);
@@ -139,103 +153,126 @@
         return;
       }
 
-      const data = {
-        action: 'generateShift',
-        yearMonth: targetMonth,
-        groups: groups.join(',')
-      };
+      showMessage('シフトを生成中です... しばらくお待ちください', 'info');
 
-      try {
-        showMessage('シフトを生成中です... しばらくお待ちください', 'info');
+      google.script.run
+        .withSuccessHandler(function(result) {
+          console.log('サーバーからのレスポンス:', result);
 
-        const response = await fetch(window.location.href, {
-          method: 'POST',
-          body: new URLSearchParams(data)
-        });
-
-        const result = await response.json();
-
-        if (result.success) {
-          currentTableId = result.data.tableId;
-          currentShiftData = result.data.shifts;
-
-          showMessage('シフト生成が完了しました', 'success');
-
-          // フィードバック表示
-          if (result.data.feedback && result.data.feedback !== '特になし') {
-            document.getElementById('feedbackText').textContent = result.data.feedback;
-            document.getElementById('feedback').classList.remove('hidden');
+          if (!result) {
+            showMessage('エラー: サーバーから応答がありませんでした', 'error');
+            return;
           }
 
-          // シフト表を表示
-          renderShiftTable(targetMonth, result.data.shifts);
+          if (result.success) {
+            currentShiftData = result.data.shifts;
+            currentStaffInfo = result.data.staffInfo;
+            currentRequestDates = result.data.requestDates;
+            currentYearMonth = result.data.yearMonth;
+            currentGroups = result.data.groups;
 
-          // PDF出力ボタンを有効化
-          document.getElementById('exportButton').disabled = false;
+            showMessage('シフト生成が完了しました。内容を確認して、確定ボタンを押してください', 'success');
 
-        } else {
-          showMessage('エラー: ' + result.error, 'error');
-        }
-      } catch (error) {
-        showMessage('通信エラー: ' + error.message, 'error');
-      }
+            // フィードバック表示
+            if (result.data.feedback && result.data.feedback !== '特になし') {
+              document.getElementById('feedbackText').textContent = result.data.feedback;
+              document.getElementById('feedback').classList.remove('hidden');
+            } else {
+              document.getElementById('feedback').classList.add('hidden');
+            }
+
+            // シフト表を表示
+            renderShiftTable(targetMonth, result.data.shifts, result.data.staffInfo, result.data.requestDates);
+
+            // 確定ボタンを有効化
+            document.getElementById('confirmButton').disabled = false;
+            document.getElementById('exportButton').disabled = true;
+
+          } else {
+            showMessage('エラー: ' + (result.error || '不明なエラー'), 'error');
+          }
+        })
+        .withFailureHandler(function(error) {
+          console.error('通信エラー:', error);
+          showMessage('通信エラー: ' + (error.message || error), 'error');
+        })
+        .generateShiftPreview(targetMonth, groups.join(','));
     }
 
-    function renderShiftTable(yearMonth, shifts) {
+    function renderShiftTable(yearMonth, shifts, staffInfo, requestDates) {
       const [year, month] = yearMonth.split('-').map(Number);
       const daysInMonth = new Date(year, month, 0).getDate();
 
-      // 職員ごとにデータを整理
-      const shiftByStaff = {};
+      // シフトデータを整理（職員名 x 日付でアクセス可能に）
+      const shiftByStaffAndDate = {};
       shifts.forEach(shift => {
-        if (!shiftByStaff[shift.staffName]) {
-          shiftByStaff[shift.staffName] = {};
+        const dateStr = typeof shift.date === 'string' ? shift.date : formatDate(shift.date);
+        if (!shiftByStaffAndDate[shift.staffName]) {
+          shiftByStaffAndDate[shift.staffName] = {};
         }
-        shiftByStaff[shift.staffName][shift.date] = shift.shiftName;
+        shiftByStaffAndDate[shift.staffName][dateStr] = shift.shiftName;
       });
 
-      const staffNames = Object.keys(shiftByStaff);
+      // 職員情報をマップに変換（名前で検索しやすく）
+      const staffInfoMap = {};
+      staffInfo.forEach(staff => {
+        staffInfoMap[staff.name] = staff;
+      });
 
-      // テーブルHTML生成
-      let html = '<table class="min-w-full border-collapse border border-gray-300 text-sm">';
+      const staffNames = staffInfo.map(s => s.name);
 
-      // ヘッダー行
-      html += '<thead><tr class="bg-gray-200"><th class="border border-gray-300 p-2">氏名</th>';
-      for (let day = 1; day <= daysInMonth; day++) {
-        const date = new Date(year, month - 1, day);
-        const weekday = getJapaneseWeekday(date);
-        const bgColor = weekday === '日' ? 'bg-red-100' : weekday === '土' ? 'bg-blue-100' : '';
-        html += `<th class="border border-gray-300 p-1 ${bgColor}">${day}<br/>(${weekday})</th>`;
-      }
+      // テーブルHTML生成（横軸：社員名、縦軸：日付）
+      let html = '<table class="border-collapse border border-gray-300 text-sm">';
+
+      // ヘッダー行（職員名）
+      html += '<thead><tr class="bg-gray-200"><th class="border border-gray-300 p-2 sticky left-0 bg-gray-200">日付</th>';
+      staffNames.forEach(staffName => {
+        const staff = staffInfoMap[staffName];
+        const certifiedLabel = staff && staff.isSuctionCertified ?
+          '<span class="inline-block bg-red-500 text-white text-xs px-1 rounded ml-1">資格者</span>' : '';
+        html += `<th class="border border-gray-300 p-2 text-center">${staffName}${certifiedLabel}</th>`;
+      });
       html += '</tr></thead>';
 
-      // データ行
+      // データ行（日付ごと）
       html += '<tbody>';
-      staffNames.forEach(staffName => {
-        html += `<tr><td class="border border-gray-300 p-2 font-medium">${staffName}</td>`;
+      for (let day = 1; day <= daysInMonth; day++) {
+        const date = new Date(year, month - 1, day);
+        const dateStr = formatDate(date);
+        const weekday = getJapaneseWeekday(date);
+        const bgColor = weekday === '日' ? 'bg-red-50' : weekday === '土' ? 'bg-blue-50' : '';
 
-        for (let day = 1; day <= daysInMonth; day++) {
-          const date = new Date(year, month - 1, day);
-          const dateKey = formatDate(date);
-          const shiftName = shiftByStaff[staffName][dateKey] || '';
+        html += `<tr class="${bgColor}">`;
+        html += `<td class="border border-gray-300 p-2 font-medium sticky left-0 ${bgColor}">${month}/${day}(${weekday})</td>`;
+
+        staffNames.forEach(staffName => {
+          const shiftName = shiftByStaffAndDate[staffName] && shiftByStaffAndDate[staffName][dateStr] || '';
+
+          // 休み希望チェック
+          const isRequestedOff = requestDates[staffName] && requestDates[staffName].includes(dateStr);
+          const requestLabel = isRequestedOff ?
+            '<span class="inline-block bg-yellow-400 text-xs px-1 rounded">休み希望</span>' : '';
 
           html += `<td class="border border-gray-300 p-1">
-            <select
-              class="w-full text-xs"
-              onchange="updateShift('${staffName}', '${dateKey}', this.value)"
-            >
-              <option value="" ${shiftName === '' ? 'selected' : ''}></option>
-              <option value="早出" ${shiftName === '早出' ? 'selected' : ''}>早出</option>
-              <option value="日勤" ${shiftName === '日勤' ? 'selected' : ''}>日勤</option>
-              <option value="遅出" ${shiftName === '遅出' ? 'selected' : ''}>遅出</option>
-              <option value="夜勤" ${shiftName === '夜勤' ? 'selected' : ''}>夜勤</option>
-              <option value="休み" ${shiftName === '休み' ? 'selected' : ''}>休み</option>
-            </select>
+            <div class="flex flex-col items-center">
+              ${requestLabel}
+              <select
+                class="w-full text-xs mt-1"
+                onchange="updateShift('${staffName}', '${dateStr}', this.value)"
+              >
+                <option value="" ${shiftName === '' ? 'selected' : ''}></option>
+                <option value="早出" ${shiftName === '早出' ? 'selected' : ''}>早出</option>
+                <option value="日勤" ${shiftName === '日勤' ? 'selected' : ''}>日勤</option>
+                <option value="遅出" ${shiftName === '遅出' ? 'selected' : ''}>遅出</option>
+                <option value="夜勤" ${shiftName === '夜勤' ? 'selected' : ''}>夜勤</option>
+                <option value="休み" ${shiftName === '休み' ? 'selected' : ''}>休み</option>
+              </select>
+            </div>
           </td>`;
-        }
+        });
 
         html += '</tr>';
-      });
+      }
       html += '</tbody></table>';
 
       document.getElementById('shiftTableContainer').innerHTML = html;
@@ -243,18 +280,67 @@
 
     function updateShift(staffName, date, shiftName) {
       // currentShiftDataを更新
-      const index = currentShiftData.findIndex(s => s.staffName === staffName && s.date === date);
+      const index = currentShiftData.findIndex(s => {
+        const shiftDate = typeof s.date === 'string' ? s.date : formatDate(s.date);
+        return s.staffName === staffName && shiftDate === date;
+      });
+
       if (index >= 0) {
         currentShiftData[index].shiftName = shiftName;
+      } else {
+        // 新規追加
+        currentShiftData.push({
+          staffName: staffName,
+          date: date,
+          shiftName: shiftName
+        });
       }
 
-      // 即座にサーバーに保存はせず、PDF出力時に保存
       console.log(`更新: ${staffName}, ${date}, ${shiftName}`);
     }
 
-    async function exportPdf() {
+    function confirmShiftData() {
+      if (!currentShiftData || currentShiftData.length === 0) {
+        showMessage('シフトデータがありません', 'warning');
+        return;
+      }
+
+      if (!confirm('シフトを確定してスプレッドシートに保存しますか？')) {
+        return;
+      }
+
+      showMessage('シフトを保存中...', 'info');
+
+      // シフトデータを整形（dateを文字列に統一）
+      const shiftsToSave = currentShiftData.map(shift => ({
+        staffName: shift.staffName,
+        date: typeof shift.date === 'string' ? shift.date : formatDate(shift.date),
+        shiftName: shift.shiftName
+      }));
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            currentTableId = result.data.tableId;
+            showMessage('シフトを確定しました', 'success');
+
+            // 確定ボタンを無効化、PDF出力ボタンを有効化
+            document.getElementById('confirmButton').disabled = true;
+            document.getElementById('exportButton').disabled = false;
+
+          } else {
+            showMessage('エラー: ' + result.error, 'error');
+          }
+        })
+        .withFailureHandler(function(error) {
+          showMessage('通信エラー: ' + error.message, 'error');
+        })
+        .confirmShift(currentYearMonth, currentGroups, shiftsToSave);
+    }
+
+    function exportPdf() {
       if (!currentTableId) {
-        showMessage('シフト表が生成されていません', 'warning');
+        showMessage('シフトを確定してください', 'warning');
         return;
       }
 
@@ -262,41 +348,32 @@
         return;
       }
 
-      const data = {
-        action: 'exportPdf',
-        tableId: currentTableId
-      };
+      showMessage('PDF出力中...', 'info');
 
-      try {
-        showMessage('PDF出力中...', 'info');
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            showMessage('PDF出力が完了しました: ' + result.data.fileName, 'success');
 
-        const response = await fetch(window.location.href, {
-          method: 'POST',
-          body: new URLSearchParams(data)
-        });
+            // リンクを表示
+            const link = document.createElement('a');
+            link.href = result.data.filePath;
+            link.target = '_blank';
+            link.textContent = 'PDFを開く';
+            link.className = 'text-blue-600 underline ml-2';
 
-        const result = await response.json();
+            const messageDiv = document.getElementById('message');
+            messageDiv.appendChild(document.createElement('br'));
+            messageDiv.appendChild(link);
 
-        if (result.success) {
-          showMessage('PDF出力が完了しました: ' + result.data.fileName, 'success');
-
-          // リンクを表示
-          const link = document.createElement('a');
-          link.href = result.data.filePath;
-          link.target = '_blank';
-          link.textContent = 'PDFを開く';
-          link.className = 'text-blue-600 underline ml-2';
-
-          const messageDiv = document.getElementById('message');
-          messageDiv.appendChild(document.createElement('br'));
-          messageDiv.appendChild(link);
-
-        } else {
-          showMessage('エラー: ' + result.error, 'error');
-        }
-      } catch (error) {
-        showMessage('通信エラー: ' + error.message, 'error');
-      }
+          } else {
+            showMessage('エラー: ' + result.error, 'error');
+          }
+        })
+        .withFailureHandler(function(error) {
+          showMessage('通信エラー: ' + error.message, 'error');
+        })
+        .exportPdfForAdmin(currentTableId);
     }
 
     function showPage(page) {

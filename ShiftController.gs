@@ -11,15 +11,10 @@
  */
 function handleGenerateShift(e) {
   try {
-    Logger.log('=== シフト自動生成を開始します ===');
-    Logger.log('パラメータ: ' + JSON.stringify(e.parameter));
+    Logger.log('シフト自動生成を開始します');
 
-    // セッションチェック
     const user = getSessionUser();
-    Logger.log('セッションユーザー: ' + (user ? user.name : 'null'));
-
     if (!user || user.role !== '管理者') {
-      Logger.log('権限エラー: 管理者権限が必要です');
       return createJsonResponse(false, '管理者権限が必要です');
     }
 
@@ -27,7 +22,6 @@ function handleGenerateShift(e) {
     const groups = parseEnumList(e.parameter.groups || '');
 
     if (!yearMonthStr || groups.length === 0) {
-      Logger.log('パラメータエラー: 年月またはグループが未指定');
       return createJsonResponse(false, '年月とグループを指定してください');
     }
 
@@ -38,20 +32,16 @@ function handleGenerateShift(e) {
     Logger.log(`対象: ${year}年${month}月、グループ: ${groups.join(',')}`);
 
     // 1. 職員データを取得
-    Logger.log('STEP 1: 職員データを取得中...');
     const staffModel = new StaffModel();
     const staffs = staffModel.getStaffsByGroup(groups);
 
     if (staffs.length === 0) {
-      Logger.log('エラー: 対象の職員が見つかりません');
       return createJsonResponse(false, '対象の職員が見つかりません');
     }
 
-    Logger.log(`対象職員数: ${staffs.length}人`);
-    Logger.log('職員名: ' + staffs.map(s => s.name).join(', '));
+    Logger.log(`対象職員数: ${staffs.length}`);
 
     // 2. 休み希望を取得
-    Logger.log('STEP 2: 休み希望を取得中...');
     const requestDetailModel = new RequestDetailModel();
     const requests = {};
 
@@ -62,18 +52,15 @@ function handleGenerateShift(e) {
     });
 
     // 3. 対象日付を生成
-    Logger.log('STEP 3: 対象日付を生成中...');
     const dates = getMonthDates(year, month);
-    Logger.log(`対象日数: ${dates.length}日`);
 
     // 4. ルールを取得
-    Logger.log('STEP 4: ルールを取得中...');
     const ruleModel = new RuleModel();
     const rulesText = ruleModel.getRulesText();
-    Logger.log('ルールテキスト長: ' + rulesText.length + '文字');
+
+    Logger.log('ルールテキストを取得しました');
 
     // 5. Gemini APIでシフト生成
-    Logger.log('STEP 5: Gemini APIでシフト生成中...');
     const geminiService = new GeminiService();
     const result = geminiService.generateShift({
       staffs: staffs,
@@ -84,13 +71,12 @@ function handleGenerateShift(e) {
 
     if (!result.success) {
       Logger.log('シフト生成失敗: ' + result.error);
-      return createJsonResponse(false, 'シフト生成失敗: ' + result.error);
+      return createJsonResponse(false, result.error);
     }
 
-    Logger.log('シフト生成成功。生成されたシフト数: ' + result.data.length);
+    Logger.log('シフト生成成功');
 
     // 6. シフト表を保存
-    Logger.log('STEP 6: シフト表を保存中...');
     const shiftTableModel = new ShiftTableModel();
     const tableId = shiftTableModel.addShiftTable({
       outputBy: user.name,
@@ -98,14 +84,12 @@ function handleGenerateShift(e) {
       groups: groups,
       filePath: '' // PDF出力時に更新
     });
-    Logger.log('シフト表ID: ' + tableId);
 
     // 7. シフト詳細を保存
-    Logger.log('STEP 7: シフト詳細を保存中...');
     const shiftTableDetailModel = new ShiftTableDetailModel();
     shiftTableDetailModel.addShiftDetails(tableId, result.data);
 
-    Logger.log('=== シフト自動生成が完了しました ===');
+    Logger.log('シフトをデータベースに保存しました');
 
     return createJsonResponse(true, {
       tableId: tableId,
@@ -114,10 +98,8 @@ function handleGenerateShift(e) {
     });
 
   } catch (error) {
-    Logger.log('=== シフト生成エラー ===');
-    Logger.log('エラーメッセージ: ' + error.message);
-    Logger.log('エラースタック: ' + error.stack);
-    return createJsonResponse(false, 'エラー: ' + error.message);
+    Logger.log('シフト生成エラー: ' + error.toString());
+    return createJsonResponse(false, error.toString());
   }
 }
 
@@ -274,123 +256,71 @@ function getShiftData(tableId) {
 }
 
 /**
- * デバッグ用: シフト生成の各ステップをテスト
- * GASエディタから直接実行してログを確認
+ * シフト自動生成プレビュー（保存なし、クライアント側から直接呼び出し）
+ * @param {string} yearMonth - 対象年月（YYYY-MM形式）
+ * @param {string} groups - 対象グループ（カンマ区切り）
+ * @returns {Object} 生成結果（職員情報、休み希望を含む）
  */
-function debugShiftGeneration() {
+function generateShiftPreview(yearMonth, groups) {
   try {
-    Logger.log('=== デバッグ: シフト生成テスト開始 ===');
+    Logger.log('シフト自動生成（プレビュー）を開始します');
 
-    // STEP 1: Config確認
-    Logger.log('STEP 1: Config確認');
-    const config = new Config();
-    try {
-      const spreadsheetId = config.getSpreadsheetId();
-      Logger.log('  スプレッドシートID: OK');
-    } catch (e) {
-      Logger.log('  スプレッドシートID: NG - ' + e.message);
-      return;
+    const user = getSessionUser();
+    if (!user || user.role !== '管理者') {
+      return {
+        success: false,
+        error: '管理者権限が必要です'
+      };
     }
 
-    try {
-      const apiKey = config.getGeminiApiKey();
-      Logger.log('  Gemini APIキー: OK (先頭10文字: ' + apiKey.substring(0, 10) + '...)');
-    } catch (e) {
-      Logger.log('  Gemini APIキー: NG - ' + e.message);
-      return;
+    const groupArray = parseEnumList(groups);
+
+    if (!yearMonth || groupArray.length === 0) {
+      return {
+        success: false,
+        error: '年月とグループを指定してください'
+      };
     }
 
-    // STEP 2: 職員データ確認
-    Logger.log('STEP 2: 職員データ確認');
+    // 年月をパース
+    const [year, month] = yearMonth.split('-').map(Number);
+    const yearMonthDate = new Date(year, month - 1, 1);
+
+    Logger.log(`対象: ${year}年${month}月、グループ: ${groupArray.join(',')}`);
+
+    // 1. 職員データを取得
     const staffModel = new StaffModel();
-    const allStaffs = staffModel.getActiveStaffs();
-    Logger.log('  有効な職員数: ' + allStaffs.length);
+    const staffs = staffModel.getStaffsByGroup(groupArray);
 
-    if (allStaffs.length === 0) {
-      Logger.log('  警告: 職員データがありません。サンプルデータを投入してください。');
-      return;
+    if (staffs.length === 0) {
+      return {
+        success: false,
+        error: '対象の職員が見つかりません'
+      };
     }
 
-    // 最初のグループを取得
-    const firstGroup = allStaffs[0].groups[0];
-    Logger.log('  テスト用グループ: ' + firstGroup);
+    Logger.log(`対象職員数: ${staffs.length}`);
 
-    const groupStaffs = staffModel.getStaffsByGroup([firstGroup]);
-    Logger.log('  グループの職員数: ' + groupStaffs.length);
-
-    // STEP 3: ルール確認
-    Logger.log('STEP 3: ルール確認');
-    const ruleModel = new RuleModel();
-    const rules = ruleModel.getAllRules();
-    Logger.log('  ルール数: ' + rules.length);
-
-    if (rules.length === 0) {
-      Logger.log('  警告: ルールがありません。サンプルデータを投入してください。');
-      return;
-    }
-
-    // STEP 4: Gemini API接続テスト
-    Logger.log('STEP 4: Gemini API接続テスト');
-    const geminiService = new GeminiService();
-    try {
-      const testResult = geminiService.testApi();
-      Logger.log('  Gemini API接続: OK');
-      Logger.log('  応答: ' + testResult.substring(0, 100) + '...');
-    } catch (e) {
-      Logger.log('  Gemini API接続: NG - ' + e.message);
-      return;
-    }
-
-    Logger.log('=== すべてのテストをパスしました ===');
-    Logger.log('実際のシフト生成を実行する準備ができています。');
-
-  } catch (error) {
-    Logger.log('=== デバッグテストでエラー ===');
-    Logger.log('エラー: ' + error.message);
-    Logger.log('スタック: ' + error.stack);
-  }
-}
-
-/**
- * デバッグ用: 簡易シフト生成テスト（2人、3日間のみ）
- * GASエディタから直接実行してログを確認
- */
-function debugSimpleShiftGeneration() {
-  try {
-    Logger.log('=== 簡易シフト生成テスト開始 ===');
-
-    // テスト用の最小データでシフト生成
-    const staffModel = new StaffModel();
-    const allStaffs = staffModel.getActiveStaffs();
-
-    if (allStaffs.length === 0) {
-      Logger.log('エラー: 職員データがありません');
-      return;
-    }
-
-    // 最初の2人のみ
-    const staffs = allStaffs.slice(0, Math.min(2, allStaffs.length));
-    Logger.log('テスト職員: ' + staffs.map(s => s.name).join(', '));
-
-    // 3日分の日付
-    const today = new Date();
-    const dates = [
-      new Date(today.getFullYear(), today.getMonth(), 1),
-      new Date(today.getFullYear(), today.getMonth(), 2),
-      new Date(today.getFullYear(), today.getMonth(), 3)
-    ];
-
-    // 休み希望は空
+    // 2. 休み希望を取得
+    const requestDetailModel = new RequestDetailModel();
     const requests = {};
-    staffs.forEach(s => requests[s.name] = []);
 
-    // シンプルなルール
-    const rulesText = `
-【ルール1】基本ルール
-- 早出、日勤、遅出、夜勤、休みのいずれかを割り当ててください
-- すべての職員に公平にシフトを配分してください
-    `;
+    staffs.forEach(staff => {
+      const requestDates = requestDetailModel.getRequestDates(staff.name, yearMonthDate);
+      requests[staff.name] = requestDates;
+      Logger.log(`${staff.name} の休み希望: ${requestDates.length}日`);
+    });
 
+    // 3. 対象日付を生成
+    const dates = getMonthDates(year, month);
+
+    // 4. ルールを取得
+    const ruleModel = new RuleModel();
+    const rulesText = ruleModel.getRulesText();
+
+    Logger.log('ルールテキストを取得しました');
+
+    // 5. Gemini APIでシフト生成
     const geminiService = new GeminiService();
     const result = geminiService.generateShift({
       staffs: staffs,
@@ -399,18 +329,327 @@ function debugSimpleShiftGeneration() {
       rulesText: rulesText
     });
 
-    if (result.success) {
-      Logger.log('=== シフト生成成功 ===');
-      Logger.log('生成されたシフト数: ' + result.data.length);
-      Logger.log('最初の3件: ' + JSON.stringify(result.data.slice(0, 3), null, 2));
-    } else {
-      Logger.log('=== シフト生成失敗 ===');
-      Logger.log('エラー: ' + result.error);
+    if (!result.success) {
+      Logger.log('シフト生成失敗: ' + result.error);
+      return {
+        success: false,
+        error: result.error
+      };
     }
 
+    Logger.log('シフト生成成功（保存なし）');
+
+    // 職員情報と休み希望をフロントエンドで使用できるように整形
+    const staffInfo = staffs.map(staff => ({
+      name: staff.name,
+      isSuctionCertified: staff.isSuctionCertified,
+      groups: staff.groups
+    }));
+
+    const requestDatesFormatted = {};
+    Object.keys(requests).forEach(staffName => {
+      requestDatesFormatted[staffName] = requests[staffName].map(date => formatDate(date));
+    });
+
+    return {
+      success: true,
+      data: {
+        shifts: result.data,
+        feedback: result.feedback,
+        staffInfo: staffInfo,
+        requestDates: requestDatesFormatted,
+        yearMonth: yearMonth,
+        groups: groupArray
+      }
+    };
+
   } catch (error) {
-    Logger.log('=== 簡易テストでエラー ===');
-    Logger.log('エラー: ' + error.message);
-    Logger.log('スタック: ' + error.stack);
+    Logger.log('シフト生成エラー: ' + error.toString());
+    return {
+      success: false,
+      error: error.toString()
+    };
+  }
+}
+
+/**
+ * シフト確定（編集済みシフトデータを保存、クライアント側から直接呼び出し）
+ * @param {string} yearMonth - 対象年月（YYYY-MM形式）
+ * @param {Array<string>} groups - 対象グループ配列
+ * @param {Array<Object>} shifts - 編集済みシフトデータ [{staffName, date, shiftName}]
+ * @returns {Object} 保存結果
+ */
+function confirmShift(yearMonth, groups, shifts) {
+  try {
+    Logger.log('シフト確定処理を開始します');
+
+    const user = getSessionUser();
+    if (!user || user.role !== '管理者') {
+      return {
+        success: false,
+        error: '管理者権限が必要です'
+      };
+    }
+
+    if (!yearMonth || !groups || !shifts || shifts.length === 0) {
+      return {
+        success: false,
+        error: '必要なデータが不足しています'
+      };
+    }
+
+    // 年月をパース
+    const [year, month] = yearMonth.split('-').map(Number);
+    const yearMonthDate = new Date(year, month - 1, 1);
+
+    Logger.log(`シフト確定: ${year}年${month}月、グループ: ${groups.join(',')}`);
+
+    // シフト表を保存
+    const shiftTableModel = new ShiftTableModel();
+    const tableId = shiftTableModel.addShiftTable({
+      outputBy: user.name,
+      yearMonth: yearMonthDate,
+      groups: groups,
+      filePath: '' // PDF出力時に更新
+    });
+
+    // シフト詳細を保存（日付文字列をDateオブジェクトに変換）
+    const shiftsWithDateObjects = shifts.map(shift => ({
+      date: parseDate(shift.date),
+      staffName: shift.staffName,
+      shiftName: shift.shiftName
+    }));
+
+    const shiftTableDetailModel = new ShiftTableDetailModel();
+    shiftTableDetailModel.addShiftDetails(tableId, shiftsWithDateObjects);
+
+    Logger.log('シフトをデータベースに保存しました');
+
+    return {
+      success: true,
+      data: {
+        tableId: tableId
+      }
+    };
+
+  } catch (error) {
+    Logger.log('シフト確定エラー: ' + error.toString());
+    return {
+      success: false,
+      error: error.toString()
+    };
+  }
+}
+
+/**
+ * シフト自動生成処理（クライアント側から直接呼び出し）
+ * @deprecated 代わりにgenerateShiftPreviewとconfirmShiftを使用してください
+ * @param {string} yearMonth - 対象年月（YYYY-MM形式）
+ * @param {string} groups - 対象グループ（カンマ区切り）
+ * @returns {Object} 生成結果
+ */
+function generateShiftForAdmin(yearMonth, groups) {
+  try {
+    Logger.log('シフト自動生成を開始します');
+
+    const user = getSessionUser();
+    if (!user || user.role !== '管理者') {
+      return {
+        success: false,
+        error: '管理者権限が必要です'
+      };
+    }
+
+    const groupArray = parseEnumList(groups);
+
+    if (!yearMonth || groupArray.length === 0) {
+      return {
+        success: false,
+        error: '年月とグループを指定してください'
+      };
+    }
+
+    // 年月をパース
+    const [year, month] = yearMonth.split('-').map(Number);
+    const yearMonthDate = new Date(year, month - 1, 1);
+
+    Logger.log(`対象: ${year}年${month}月、グループ: ${groupArray.join(',')}`);
+
+    // 1. 職員データを取得
+    const staffModel = new StaffModel();
+    const staffs = staffModel.getStaffsByGroup(groupArray);
+
+    if (staffs.length === 0) {
+      return {
+        success: false,
+        error: '対象の職員が見つかりません'
+      };
+    }
+
+    Logger.log(`対象職員数: ${staffs.length}`);
+
+    // 2. 休み希望を取得
+    const requestDetailModel = new RequestDetailModel();
+    const requests = {};
+
+    staffs.forEach(staff => {
+      const requestDates = requestDetailModel.getRequestDates(staff.name, yearMonthDate);
+      requests[staff.name] = requestDates;
+      Logger.log(`${staff.name} の休み希望: ${requestDates.length}日`);
+    });
+
+    // 3. 対象日付を生成
+    const dates = getMonthDates(year, month);
+
+    // 4. ルールを取得
+    const ruleModel = new RuleModel();
+    const rulesText = ruleModel.getRulesText();
+
+    Logger.log('ルールテキストを取得しました');
+
+    // 5. Gemini APIでシフト生成
+    const geminiService = new GeminiService();
+    const result = geminiService.generateShift({
+      staffs: staffs,
+      requests: requests,
+      dates: dates,
+      rulesText: rulesText
+    });
+
+    if (!result.success) {
+      Logger.log('シフト生成失敗: ' + result.error);
+      return {
+        success: false,
+        error: result.error
+      };
+    }
+
+    Logger.log('シフト生成成功');
+
+    // 6. シフト表を保存
+    const shiftTableModel = new ShiftTableModel();
+    const tableId = shiftTableModel.addShiftTable({
+      outputBy: user.name,
+      yearMonth: yearMonthDate,
+      groups: groupArray,
+      filePath: '' // PDF出力時に更新
+    });
+
+    // 7. シフト詳細を保存
+    const shiftTableDetailModel = new ShiftTableDetailModel();
+    shiftTableDetailModel.addShiftDetails(tableId, result.data);
+
+    Logger.log('シフトをデータベースに保存しました');
+
+    return {
+      success: true,
+      data: {
+        tableId: tableId,
+        shifts: result.data,
+        feedback: result.feedback
+      }
+    };
+
+  } catch (error) {
+    Logger.log('シフト生成エラー: ' + error.toString());
+    return {
+      success: false,
+      error: error.toString()
+    };
+  }
+}
+
+/**
+ * PDF出力処理（クライアント側から直接呼び出し）
+ * @param {string} tableId - シフト表ID
+ * @returns {Object} 出力結果
+ */
+function exportPdfForAdmin(tableId) {
+  try {
+    Logger.log('PDF出力を開始します');
+
+    const user = getSessionUser();
+    if (!user || user.role !== '管理者') {
+      return {
+        success: false,
+        error: '管理者権限が必要です'
+      };
+    }
+
+    if (!tableId) {
+      return {
+        success: false,
+        error: 'シフト表IDを指定してください'
+      };
+    }
+
+    // シフト表データを取得
+    const shiftTableModel = new ShiftTableModel();
+    const table = shiftTableModel.findById(tableId, 0);
+
+    if (!table) {
+      return {
+        success: false,
+        error: 'シフト表が見つかりません'
+      };
+    }
+
+    const tableData = {
+      tableId: table.data[0],
+      outputBy: table.data[1],
+      yearMonth: parseDate(table.data[2]),
+      groups: parseEnumList(table.data[3]),
+      filePath: table.data[4]
+    };
+
+    // シフト詳細を取得
+    const shiftTableDetailModel = new ShiftTableDetailModel();
+    const details = shiftTableDetailModel.getDetailsByTableId(tableId);
+
+    // 職員データを取得
+    const staffModel = new StaffModel();
+    const staffs = staffModel.getStaffsByGroup(tableData.groups);
+
+    // PDF出力
+    const pdfService = new PdfService();
+    const result = pdfService.exportToPdf({
+      yearMonth: tableData.yearMonth,
+      groups: tableData.groups,
+      shiftData: details,
+      staffs: staffs
+    });
+
+    if (!result.success) {
+      return {
+        success: false,
+        error: result.error
+      };
+    }
+
+    // ファイルパスを更新
+    shiftTableModel.updateRow(table.rowIndex, [
+      tableData.tableId,
+      tableData.outputBy,
+      formatDate(tableData.yearMonth),
+      toEnumList(tableData.groups),
+      result.filePath
+    ]);
+
+    Logger.log('PDF出力完了: ' + result.fileName);
+
+    return {
+      success: true,
+      data: {
+        fileName: result.fileName,
+        filePath: result.filePath
+      }
+    };
+
+  } catch (error) {
+    Logger.log('PDF出力エラー: ' + error.toString());
+    return {
+      success: false,
+      error: error.toString()
+    };
   }
 }

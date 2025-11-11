@@ -55,6 +55,66 @@ function handleSubmitRequest(e) {
 }
 
 /**
+ * 休み希望提出処理（クライアント側から直接呼び出し）
+ * @param {Array<string>} dates - 日付配列（YYYY/MM/DD形式）
+ * @param {string} notes - 特記事項
+ * @returns {Object} 提出結果
+ */
+function submitRequestForClient(dates, notes) {
+  try {
+    Logger.log('休み希望提出を開始します');
+
+    const user = getSessionUser();
+    if (!user) {
+      return {
+        success: false,
+        error: 'ログインが必要です'
+      };
+    }
+
+    if (!dates || dates.length === 0) {
+      return {
+        success: false,
+        error: '日付を指定してください'
+      };
+    }
+
+    const dateObjects = dates.map(dateStr => parseDate(dateStr));
+
+    Logger.log(`${user.name} の休み希望: ${dateObjects.length}日`);
+
+    // 1. シフト希望を追加
+    const requestModel = new RequestModel();
+    const requestId = requestModel.addRequest({
+      staffName: user.name,
+      submitDate: new Date(),
+      notes: notes || ''
+    });
+
+    // 2. シフト希望詳細を追加
+    const requestDetailModel = new RequestDetailModel();
+    requestDetailModel.addRequestDetails(requestId, dateObjects);
+
+    Logger.log('休み希望を保存しました');
+
+    return {
+      success: true,
+      data: {
+        requestId: requestId,
+        message: '休み希望を提出しました'
+      }
+    };
+
+  } catch (error) {
+    Logger.log('休み希望提出エラー: ' + error.toString());
+    return {
+      success: false,
+      error: error.toString()
+    };
+  }
+}
+
+/**
  * 休み希望を取得（クライアント側から呼び出し）
  * @param {string} staffName - 職員名（省略時はログインユーザー）
  * @param {string} yearMonth - 年月（YYYY-MM形式）
