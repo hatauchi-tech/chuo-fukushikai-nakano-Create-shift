@@ -134,7 +134,9 @@
             // ログイン成功 - ページ遷移
             // 管理者の場合はリーダー画面、一般の場合はスタッフ画面へ
             const redirectPage = result.data.role === '管理者' ? 'leader' : 'staff';
-            window.location.href = '?page=' + redirectPage;
+            // 現在のURLからクエリパラメータを除いたベースURLを取得
+            const baseUrl = window.location.href.split('?')[0];
+            window.location.href = baseUrl + '?page=' + redirectPage;
           } else {
             showLoading(false);
             showError(result.error);

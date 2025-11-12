@@ -13,20 +13,21 @@
  */
 function doGet(e) {
   try {
-    Logger.log('doGet started');
-    Logger.log('Page parameter: ' + (e.parameter ? e.parameter.page : 'none'));
+    Logger.log('=== doGet started ===');
+    Logger.log('e.parameter: ' + JSON.stringify(e.parameter));
+
+    // ページパラメータを取得
+    const page = e.parameter ? e.parameter.page : null;
+    Logger.log('Page parameter: ' + page);
 
     // セッション情報の確認
     const userProperties = PropertiesService.getUserProperties();
     const sessionUser = userProperties.getProperty('sessionUser');
-
     Logger.log('Session user: ' + (sessionUser ? 'exists' : 'null'));
-
-    // ページパラメータを取得
-    const page = e.parameter ? e.parameter.page : null;
 
     // ログイン画面は常に表示可能
     if (!page || page === 'login') {
+      Logger.log('Rendering Login page');
       return renderPage('Login');
     }
 
@@ -37,19 +38,30 @@ function doGet(e) {
     }
 
     // ページパラメータに基づいてルーティング
+    Logger.log('Routing to page: ' + page);
     switch(page) {
       case 'staff':
+        Logger.log('Rendering StaffDashboard');
         return renderPage('StaffDashboard');
       case 'leader':
+        Logger.log('Rendering LeaderDashboard');
         return renderPage('LeaderDashboard');
       case 'master':
+        Logger.log('Rendering MasterManagement');
         return renderPage('MasterManagement');
       default:
+        Logger.log('Unknown page, rendering Login');
         return renderPage('Login');
     }
   } catch (error) {
-    Logger.log('Error in doGet: ' + error.toString());
-    return HtmlService.createHtmlOutput('エラーが発生しました: ' + error.toString());
+    Logger.log('=== Error in doGet ===');
+    Logger.log('Error message: ' + error.message);
+    Logger.log('Error stack: ' + error.stack);
+    return HtmlService.createHtmlOutput(
+      '<h1>エラーが発生しました</h1>' +
+      '<p>' + error.toString() + '</p>' +
+      '<pre>' + error.stack + '</pre>'
+    );
   }
 }
 
