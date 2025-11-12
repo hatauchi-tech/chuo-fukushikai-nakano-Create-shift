@@ -131,12 +131,9 @@
       google.script.run
         .withSuccessHandler(function(result) {
           if (result.success) {
-            // ログイン成功 - ページ遷移
-            // 管理者の場合はリーダー画面、一般の場合はスタッフ画面へ
-            const redirectPage = result.data.role === '管理者' ? 'leader' : 'staff';
-            // 現在のURLからクエリパラメータを除いたベースURLを取得
-            const baseUrl = window.location.href.split('?')[0];
-            window.location.href = baseUrl + '?page=' + redirectPage;
+            // ログイン成功 - ページをリロード
+            // サーバー側のdoGetがセッション情報に基づいて適切なページにルーティングする
+            window.location.reload();
           } else {
             showLoading(false);
             showError(result.error);

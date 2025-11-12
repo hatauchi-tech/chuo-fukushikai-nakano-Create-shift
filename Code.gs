@@ -17,7 +17,7 @@ function doGet(e) {
     Logger.log('e.parameter: ' + JSON.stringify(e.parameter));
 
     // ページパラメータを取得
-    const page = e.parameter ? e.parameter.page : null;
+    let page = e.parameter ? e.parameter.page : null;
     Logger.log('Page parameter: ' + page);
 
     // セッション情報の確認
@@ -25,9 +25,28 @@ function doGet(e) {
     const sessionUser = userProperties.getProperty('sessionUser');
     Logger.log('Session user: ' + (sessionUser ? 'exists' : 'null'));
 
-    // ログイン画面は常に表示可能
-    if (!page || page === 'login') {
-      Logger.log('Rendering Login page');
+    // ログアウトまたは明示的なログイン画面要求
+    if (page === 'login') {
+      Logger.log('Rendering Login page (explicit request)');
+      return renderPage('Login');
+    }
+
+    // セッションが存在する場合の自動ルーティング
+    if (sessionUser && !page) {
+      // ログイン済みでページ指定なし→ロールに基づいて自動判定
+      try {
+        const user = JSON.parse(sessionUser);
+        page = user.role === '管理者' ? 'leader' : 'staff';
+        Logger.log('Auto-routing logged-in user to: ' + page);
+      } catch (error) {
+        Logger.log('Session parse error: ' + error.toString());
+        return renderPage('Login');
+      }
+    }
+
+    // ページパラメータなし＆セッションなし→ログイン画面
+    if (!page) {
+      Logger.log('No page parameter and no session, rendering Login');
       return renderPage('Login');
     }
 
