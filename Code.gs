@@ -24,6 +24,7 @@ function doGet(e) {
     const userProperties = PropertiesService.getUserProperties();
     const sessionUser = userProperties.getProperty('sessionUser');
     Logger.log('Session user: ' + (sessionUser ? 'exists' : 'null'));
+    Logger.log('Session user value: ' + sessionUser);
 
     // ログアウトまたは明示的なログイン画面要求
     if (page === 'login') {
@@ -32,19 +33,25 @@ function doGet(e) {
     }
 
     // セッションが存在する場合の自動ルーティング
+    Logger.log('Checking auto-routing: sessionUser=' + !!sessionUser + ', page=' + page);
     if (sessionUser && !page) {
+      Logger.log('Entering auto-routing block');
       // ログイン済みでページ指定なし→ロールに基づいて自動判定
       try {
         const user = JSON.parse(sessionUser);
+        Logger.log('Parsed user: ' + JSON.stringify(user));
         page = user.role === '管理者' ? 'leader' : 'staff';
         Logger.log('Auto-routing logged-in user to: ' + page);
       } catch (error) {
         Logger.log('Session parse error: ' + error.toString());
         return renderPage('Login');
       }
+    } else {
+      Logger.log('Skipped auto-routing: sessionUser=' + !!sessionUser + ', !page=' + !page);
     }
 
     // ページパラメータなし＆セッションなし→ログイン画面
+    Logger.log('After auto-routing, page value: ' + page);
     if (!page) {
       Logger.log('No page parameter and no session, rendering Login');
       return renderPage('Login');
